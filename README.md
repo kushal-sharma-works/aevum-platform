@@ -8,4 +8,4 @@ The system is designed around immutable event ingestion, deterministic decision 
 
 - `services/`   – Backend microservices (Go, .NET)
 - `frontend/`   – Web UI (Vue + TypeScript)
-- `devops/`     – Infrastructur
+- `devops/`     – Infrastructure
