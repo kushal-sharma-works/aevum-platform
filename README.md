@@ -8,4 +8,7 @@ The system is designed around immutable event ingestion, deterministic decision 
 
 - `services/`   – Backend microservices (Go, .NET)
 - `frontend/`   – Web UI (Vue + TypeScript)
+	- `frontend/aevum-ui/` – Full PR4 application (Vue 3 + TypeScript + Pinia + Vite)
 - `devops/`     – Infrastructure
+	- `devops/pulumi/` – Full Pulumi TypeScript IaC for AWS (VPC, EKS, DynamoDB, OpenSearch, DocumentDB, ECR, Lambda, S3/CloudFront, IAM, monitoring)
+
