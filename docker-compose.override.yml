@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  event-timeline:
+    environment:
+      AEVUM_LOG_LEVEL: debug
+    volumes:
+      - ./services/event-timeline:/app
+
+  decision-engine:
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+    volumes:
+      - ./services/decision-engine:/src
+
+  query-audit:
+    environment:
+      AEVUM_LOG_LEVEL: debug
+    volumes:
+      - ./services/query-audit:/app
+
+  aevum-ui:
+    environment:
+      NGINX_ENTRYPOINT_QUIET_LOGS: "1"
+    volumes:
+      - ./frontend/aevum-ui:/usr/share/nginx/html:ro

@@ -1,0 +1,29 @@
+name: CD Dev
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-dev:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Update dev image tags
+        run: |
+          SHA=${GITHUB_SHA}
+          for svc in event-timeline decision-engine query-audit aevum-ui; do
+            file="devops/helm/charts/$svc/values-dev.yaml"
+            sed -i "s|tag: .*|tag: $SHA|" "$file"
+          done
+      - name: Commit chart tag updates
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@users.noreply.github.com
+          git add devops/helm/charts/*/values-dev.yaml
+          git commit -m "chore(cd): update dev image tags [skip ci]" || exit 0
+          git push

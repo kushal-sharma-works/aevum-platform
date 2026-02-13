@@ -1,0 +1,33 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  validate-helm-argocd:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.1
+      - name: Helm lint
+        run: |
+          helm lint devops/helm/charts/event-timeline
+          helm lint devops/helm/charts/decision-engine
+          helm lint devops/helm/charts/query-audit
+          helm lint devops/helm/charts/aevum-ui
+          helm lint devops/helm/umbrella
+      - name: Helm template
+        run: |
+          helm template event-timeline devops/helm/charts/event-timeline -f devops/helm/charts/event-timeline/values-dev.yaml > /tmp/event-timeline.yaml
+          helm template decision-engine devops/helm/charts/decision-engine -f devops/helm/charts/decision-engine/values-dev.yaml > /tmp/decision-engine.yaml
+          helm template query-audit devops/helm/charts/query-audit -f devops/helm/charts/query-audit/values-dev.yaml > /tmp/query-audit.yaml
+          helm template aevum-ui devops/helm/charts/aevum-ui -f devops/helm/charts/aevum-ui/values-dev.yaml > /tmp/aevum-ui.yaml
+      - name: Validate Argo manifests syntax
+        run: |
+          for f in devops/argocd/project.yaml devops/argocd/applicationset.yaml devops/argocd/apps/*.yaml; do
+            grep -q "apiVersion:" "$f"
+            grep -q "kind:" "$f"
+          done
