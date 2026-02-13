@@ -1,0 +1,8 @@
+replicaCount: 3
+image:
+  repository: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/aevum-event-timeline
+  tag: latest
+ingress:
+  enabled: true
+config:
+  logLevel: warn

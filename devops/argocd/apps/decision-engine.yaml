@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: decision-engine-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: aevum
+spec:
+  project: aevum
+  source:
+    repoURL: https://github.com/kushal-sharma-works/aevum-platform.git
+    targetRevision: main
+    path: devops/helm/charts/decision-engine
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: aevum-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

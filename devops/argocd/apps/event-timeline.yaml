@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: event-timeline-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: aevum
+spec:
+  project: aevum
+  source:
+    repoURL: https://github.com/kushal-sharma-works/aevum-platform.git
+    targetRevision: main
+    path: devops/helm/charts/event-timeline
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: aevum-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        maxDuration: 3m0s
+        factor: 2

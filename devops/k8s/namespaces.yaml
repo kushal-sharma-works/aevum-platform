@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aevum-dev
+  labels:
+    environment: dev
+    project: aevum
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aevum-staging
+  labels:
+    environment: staging
+    project: aevum
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aevum-prod
+  labels:
+    environment: prod
+    project: aevum
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aevum-monitoring
+  labels:
+    environment: shared
+    project: aevum

@@ -1,0 +1,139 @@
+stages:
+  - lint
+  - test
+  - build
+  - deploy
+
+variables:
+  GO_VERSION: "1.22"
+  DOTNET_VERSION: "9.0"
+  NODE_VERSION: "22"
+
+.event-timeline-changes: &event-timeline-changes
+  rules:
+    - changes:
+        - services/event-timeline/**
+
+.decision-engine-changes: &decision-engine-changes
+  rules:
+    - changes:
+        - services/decision-engine/**
+
+.query-audit-changes: &query-audit-changes
+  rules:
+    - changes:
+        - services/query-audit/**
+
+.frontend-changes: &frontend-changes
+  rules:
+    - changes:
+        - frontend/**
+
+lint:event-timeline:
+  stage: lint
+  image: golangci/golangci-lint:v1.61-alpine
+  <<: *event-timeline-changes
+  script:
+    - cd services/event-timeline
+    - golangci-lint run ./...
+
+lint:decision-engine:
+  stage: lint
+  image: mcr.microsoft.com/dotnet/sdk:9.0
+  <<: *decision-engine-changes
+  script:
+    - cd services/decision-engine
+    - dotnet format --verify-no-changes DecisionEngine.sln
+
+lint:frontend:
+  stage: lint
+  image: node:22-alpine
+  <<: *frontend-changes
+  script:
+    - cd frontend/aevum-ui
+    - npm ci
+    - npm run lint
+    - npm run type-check
+
+test:event-timeline:
+  stage: test
+  image: golang:1.22-alpine
+  <<: *event-timeline-changes
+  script:
+    - cd services/event-timeline
+    - go test ./... -v -race -coverprofile=coverage.out
+
+test:decision-engine:
+  stage: test
+  image: mcr.microsoft.com/dotnet/sdk:9.0
+  <<: *decision-engine-changes
+  services:
+    - mongo:7.0
+  variables:
+    MongoDb__ConnectionString: mongodb://mongo:27017/aevum-test
+  script:
+    - cd services/decision-engine
+    - dotnet test DecisionEngine.sln -c Release --collect:"XPlat Code Coverage"
+
+test:frontend:
+  stage: test
+  image: node:22-alpine
+  <<: *frontend-changes
+  script:
+    - cd frontend/aevum-ui
+    - npm ci
+    - npm run test:coverage
+
+build:images:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  parallel:
+    matrix:
+      - SERVICE: event-timeline
+        CONTEXT: services/event-timeline
+      - SERVICE: decision-engine
+        CONTEXT: services/decision-engine
+      - SERVICE: query-audit
+        CONTEXT: services/query-audit
+      - SERVICE: aevum-ui
+        CONTEXT: frontend/aevum-ui
+  before_script:
+    - aws ecr get-login-password --region eu-central-1 | docker login --username AWS --password-stdin $ECR_REGISTRY
+  script:
+    - docker build -t $ECR_REGISTRY/aevum-$SERVICE:$CI_COMMIT_SHA -f $CONTEXT/Dockerfile $CONTEXT
+    - docker push $ECR_REGISTRY/aevum-$SERVICE:$CI_COMMIT_SHA
+
+deploy:dev:
+  stage: deploy
+  image: alpine/helm:3.16
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  script:
+    - echo "ArgoCD sync triggered via image tag update"
+  environment:
+    name: dev
+
+deploy:staging:
+  stage: deploy
+  image: alpine/helm:3.16
+  rules:
+    - if: $CI_COMMIT_BRANCH == "release"
+  script:
+    - echo "ArgoCD sync triggered for staging"
+  environment:
+    name: staging
+
+deploy:prod:
+  stage: deploy
+  image: alpine/helm:3.16
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  script:
+    - echo "ArgoCD sync triggered for production"
+  environment:
+    name: production
+  when: manual

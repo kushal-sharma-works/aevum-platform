@@ -1,0 +1,44 @@
+replicaCount: 2
+image:
+  repository: ""
+  tag: latest
+  pullPolicy: IfNotPresent
+nameOverride: ""
+fullnameOverride: ""
+serviceAccount:
+  create: true
+  annotations: {}
+  name: aevum-ui
+service:
+  type: ClusterIP
+  port: 80
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: api.aevum.local
+      paths:
+        - path: /
+          pathType: Prefix
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+livenessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 15
+readinessProbe:
+  httpGet:
+    path: /
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 10
+config:
+  NGINX_ENTRYPOINT_QUIET_LOGS: "1"

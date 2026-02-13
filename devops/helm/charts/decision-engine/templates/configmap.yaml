@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "decision-engine.fullname" . }}
+  labels:
+    {{- include "decision-engine.labels" . | nindent 4 }}
+data:
+  ASPNETCORE_ENVIRONMENT: "{{ .Values.config.ASPNETCORE_ENVIRONMENT }}"
+  ASPNETCORE_URLS: "{{ .Values.config.ASPNETCORE_URLS }}"
+  MongoDb__ConnectionString: "{{ .Values.config.MongoDb__ConnectionString }}"
+  MongoDb__DatabaseName: "{{ .Values.config.MongoDb__DatabaseName }}"
+  EventTimeline__BaseUrl: "{{ .Values.config.EventTimeline__BaseUrl }}"
+  EventTimeline__TimeoutSeconds: "{{ .Values.config.EventTimeline__TimeoutSeconds }}"
+  Observability__OtlpEndpoint: "{{ .Values.config.Observability__OtlpEndpoint }}"
+
