@@ -1,4 +1,5 @@
 using MongoDB.Bson;
+using System.Text.Json;
 using Aevum.DecisionEngine.Domain.Models;
 using Aevum.DecisionEngine.Infrastructure.Persistence.Models;
 
@@ -56,7 +57,7 @@ public static class RuleDocumentMapper
         {
             Field = condition.Field,
             Operator = condition.Operator,
-            Value = BsonValue.Create(condition.Value),
+            Value = BsonValue.Create(NormalizeValue(condition.Value)),
             LogicalOperator = condition.LogicalOperator,
             NestedConditions = condition.NestedConditions.Select(nc => nc.ToDocument()).ToList()
         };
@@ -79,9 +80,42 @@ public static class RuleDocumentMapper
         return new RuleActionDocument
         {
             Type = action.Type,
-            Parameters = action.Parameters.ToDictionary(kvp => kvp.Key, kvp => BsonValue.Create(kvp.Value)),
+            Parameters = action.Parameters.ToDictionary(kvp => kvp.Key, kvp => BsonValue.Create(NormalizeValue(kvp.Value))),
             Order = action.Order,
             Description = action.Description
+        };
+    }
+
+    private static object? NormalizeValue(object? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (value is JsonElement jsonElement)
+        {
+            return JsonElementToObject(jsonElement);
+        }
+
+        return value;
+    }
+
+    private static object? JsonElementToObject(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number when element.TryGetInt32(out var intValue) => intValue,
+            JsonValueKind.Number when element.TryGetInt64(out var longValue) => longValue,
+            JsonValueKind.Number when element.TryGetDecimal(out var decimalValue) => decimalValue,
+            JsonValueKind.Number => element.GetDouble(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Array => element.EnumerateArray().Select(JsonElementToObject).ToList(),
+            JsonValueKind.Object => element.EnumerateObject().ToDictionary(p => p.Name, p => JsonElementToObject(p.Value)),
+            JsonValueKind.Null => null,
+            _ => element.GetRawText()
         };
     }
 

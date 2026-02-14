@@ -1,9 +1,9 @@
 using FluentValidation;
+using Microsoft.AspNetCore.Mvc;
 using Aevum.DecisionEngine.Application.DTOs;
 using Aevum.DecisionEngine.Application.Mapping;
 using Aevum.DecisionEngine.Application.Services;
 using Aevum.DecisionEngine.Domain.Interfaces;
-using Microsoft.AspNetCore.Mvc;
 
 namespace Aevum.DecisionEngine.Api.Endpoints;
 
@@ -40,7 +40,7 @@ public static class DecisionEndpoints
     }
 
     private static async Task<IResult> EvaluateDecisionAsync(
-        EvaluateDecisionRequest request,
+        [FromBody] EvaluateDecisionRequest request,
         [FromServices] IValidator<EvaluateDecisionRequest> validator,
         [FromServices] EvaluationService evaluationService,
         [FromServices] RuleManagementService ruleManagementService,
@@ -68,7 +68,7 @@ public static class DecisionEndpoints
     }
 
     private static async Task<IResult> GetDecisionByIdAsync(
-        string id,
+        [FromRoute] string id,
         [FromServices] IDecisionRepository repository,
         CancellationToken cancellationToken)
     {
@@ -83,7 +83,7 @@ public static class DecisionEndpoints
     }
 
     private static async Task<IResult> GetDecisionByRequestIdAsync(
-        string requestId,
+        [FromRoute] string requestId,
         [FromServices] IDecisionRepository repository,
         CancellationToken cancellationToken)
     {
@@ -98,8 +98,8 @@ public static class DecisionEndpoints
     }
 
     private static async Task<IResult> GetDecisionsByRuleIdAsync(
-        string ruleId,
-        int? version,
+        [FromRoute] string ruleId,
+        [FromQuery] int? version,
         [FromServices] IDecisionRepository repository,
         CancellationToken cancellationToken)
     {

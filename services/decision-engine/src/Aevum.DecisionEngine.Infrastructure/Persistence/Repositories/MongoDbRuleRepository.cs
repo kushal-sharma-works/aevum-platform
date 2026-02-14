@@ -72,7 +72,8 @@ public sealed class MongoDbRuleRepository : IRuleRepository
     public async Task<Rule> UpdateAsync(Rule rule, CancellationToken cancellationToken = default)
     {
         var doc = rule.ToDocument();
-        await _collection.InsertOneAsync(doc, cancellationToken: cancellationToken);
+        var filter = Builders<RuleDocument>.Filter.Eq(r => r.Id, rule.Id);
+        await _collection.ReplaceOneAsync(filter, doc, new ReplaceOptions { IsUpsert = false }, cancellationToken);
         return doc.ToDomain();
     }
 

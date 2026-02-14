@@ -1,4 +1,5 @@
 using MongoDB.Bson;
+using System.Text.Json;
 using Aevum.DecisionEngine.Domain.Models;
 using Aevum.DecisionEngine.Infrastructure.Persistence.Models;
 
@@ -15,14 +16,47 @@ public static class DecisionDocumentMapper
             RuleVersion = decision.RuleVersion,
             RequestId = decision.RequestId,
             Status = decision.Status,
-            InputContext = decision.InputContext.ToDictionary(kvp => kvp.Key, kvp => BsonValue.Create(kvp.Value)),
+            InputContext = decision.InputContext.ToDictionary(kvp => kvp.Key, kvp => BsonValue.Create(NormalizeValue(kvp.Value))),
             MatchedConditions = decision.MatchedConditions.ToList(),
             ExecutedActions = decision.ExecutedActions.Select(a => a.ToDocument()).ToList(),
             EvaluatedAt = decision.EvaluatedAt,
             DeterministicHash = decision.DeterministicHash,
             ErrorMessage = decision.ErrorMessage,
-            OutputData = decision.OutputData.ToDictionary(kvp => kvp.Key, kvp => BsonValue.Create(kvp.Value)),
+            OutputData = decision.OutputData.ToDictionary(kvp => kvp.Key, kvp => BsonValue.Create(NormalizeValue(kvp.Value))),
             EvaluationDurationMs = decision.EvaluationDurationMs
+        };
+    }
+
+    private static object? NormalizeValue(object? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        if (value is JsonElement jsonElement)
+        {
+            return JsonElementToObject(jsonElement);
+        }
+
+        return value;
+    }
+
+    private static object? JsonElementToObject(JsonElement element)
+    {
+        return element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Number when element.TryGetInt32(out var intValue) => intValue,
+            JsonValueKind.Number when element.TryGetInt64(out var longValue) => longValue,
+            JsonValueKind.Number when element.TryGetDecimal(out var decimalValue) => decimalValue,
+            JsonValueKind.Number => element.GetDouble(),
+            JsonValueKind.True => true,
+            JsonValueKind.False => false,
+            JsonValueKind.Array => element.EnumerateArray().Select(JsonElementToObject).ToList(),
+            JsonValueKind.Object => element.EnumerateObject().ToDictionary(p => p.Name, p => JsonElementToObject(p.Value)),
+            JsonValueKind.Null => null,
+            _ => element.GetRawText()
         };
     }
 

@@ -42,7 +42,13 @@ public sealed class CreateRuleRequestValidator : AbstractValidator<CreateRuleReq
 
 public sealed class RuleConditionDtoValidator : AbstractValidator<RuleConditionDto>
 {
-    public RuleConditionDtoValidator()
+    private const int DefaultMaxNestingDepth = 5;
+
+    public RuleConditionDtoValidator() : this(DefaultMaxNestingDepth)
+    {
+    }
+
+    private RuleConditionDtoValidator(int remainingDepth)
     {
         RuleFor(x => x.Field)
             .NotEmpty().WithMessage("Field name is required")
@@ -58,9 +64,18 @@ public sealed class RuleConditionDtoValidator : AbstractValidator<RuleConditionD
             .IsInEnum().WithMessage("Invalid logical operator")
             .When(x => x.LogicalOperator.HasValue);
 
-        RuleForEach(x => x.NestedConditions)
-            .SetValidator(_ => new RuleConditionDtoValidator())
-            .When(x => x.NestedConditions is not null && x.NestedConditions.Count > 0);
+        if (remainingDepth > 0)
+        {
+            RuleForEach(x => x.NestedConditions)
+                .SetValidator(new RuleConditionDtoValidator(remainingDepth - 1))
+                .When(x => x.NestedConditions is not null && x.NestedConditions.Count > 0);
+        }
+        else
+        {
+            RuleFor(x => x.NestedConditions)
+                .Must(nested => nested is null || nested.Count == 0)
+                .WithMessage($"Nested conditions exceed maximum depth of {DefaultMaxNestingDepth}");
+        }
     }
 }
 
