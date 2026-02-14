@@ -5,17 +5,20 @@ defineProps<{ rules: ReadonlyArray<Rule> }>()
 </script>
 
 <template>
-	<div class="space-y-2">
-		<RouterLink
+	<q-list bordered separator>
+		<q-item
 			v-for="rule in rules"
 			:key="`${rule.ruleId}-${rule.version}`"
 			:to="`/rules/${rule.ruleId}`"
-			class="block rounded border border-slate-800 p-3"
+			clickable
 		>
-			<div class="flex justify-between">
-				<span>{{ rule.name }}</span>
-				<span class="text-xs text-slate-400">v{{ rule.version }}</span>
-			</div>
-		</RouterLink>
-	</div>
+			<q-item-section>
+				<q-item-label class="text-weight-medium">{{ rule.name }}</q-item-label>
+				<q-item-label caption>{{ rule.ruleId }}</q-item-label>
+			</q-item-section>
+			<q-item-section side>
+				<q-badge color="primary">v{{ rule.version }}</q-badge>
+			</q-item-section>
+		</q-item>
+	</q-list>
 </template>

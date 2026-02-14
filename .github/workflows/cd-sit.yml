@@ -1,29 +1,29 @@
-name: CD Prod
+name: CD SIT
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
+    branches: [main]
 
 jobs:
-  deploy-prod:
+  deploy-sit:
     runs-on: ubuntu-latest
-    environment: production
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-      - name: Update prod image tags
+        with:
+          ref: main
+      - name: Update SIT image tags
         run: |
-          TAG=${GITHUB_REF_NAME}
+          SHA=${GITHUB_SHA}
           for svc in event-timeline decision-engine query-audit aevum-ui; do
-            file="devops/helm/charts/$svc/values-prod.yaml"
-            sed -i "s|tag: .*|tag: $TAG|" "$file"
+            file="devops/helm/charts/$svc/values-sit.yaml"
+            sed -i "s|tag: .*|tag: $SHA|" "$file"
           done
       - name: Commit chart tag updates
         run: |
           git config user.name github-actions
           git config user.email github-actions@users.noreply.github.com
-          git add devops/helm/charts/*/values-prod.yaml
-          git commit -m "chore(cd): update prod image tags [skip ci]" || exit 0
+          git add devops/helm/charts/*/values-sit.yaml
+          git commit -m "chore(cd): update sit image tags [skip ci]" || exit 0
           git push

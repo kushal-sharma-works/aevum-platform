@@ -5,41 +5,33 @@ metadata:
   namespace: argocd
 spec:
   generators:
-    - matrix:
-        generators:
-          - list:
-              elements:
-                - service: event-timeline
-                  path: devops/helm/charts/event-timeline
-                - service: decision-engine
-                  path: devops/helm/charts/decision-engine
-                - service: query-audit
-                  path: devops/helm/charts/query-audit
-                - service: aevum-ui
-                  path: devops/helm/charts/aevum-ui
-          - list:
-              elements:
-                - env: dev
-                  branch: main
-                - env: staging
-                  branch: release
+    - list:
+        elements:
+          - service: event-timeline
+            path: devops/helm/charts/event-timeline
+          - service: decision-engine
+            path: devops/helm/charts/decision-engine
+          - service: query-audit
+            path: devops/helm/charts/query-audit
+          - service: aevum-ui
+            path: devops/helm/charts/aevum-ui
   template:
     metadata:
-      name: '{{service}}-{{env}}'
+      name: '{{service}}-sit'
       namespace: argocd
     spec:
       project: aevum
       source:
         repoURL: https://github.com/kushal-sharma-works/aevum-platform.git
-        targetRevision: '{{branch}}'
+        targetRevision: main
         path: '{{path}}'
         helm:
           valueFiles:
             - values.yaml
-            - values-{{env}}.yaml
+            - values-sit.yaml
       destination:
         server: https://kubernetes.default.svc
-        namespace: aevum-{{env}}
+        namespace: aevum-sit
       syncPolicy:
         automated:
           prune: true

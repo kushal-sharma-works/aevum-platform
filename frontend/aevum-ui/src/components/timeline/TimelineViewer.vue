@@ -18,23 +18,36 @@ const onScroll = () => {
 </script>
 
 <template>
-	<section class="space-y-2">
-		<header class="flex items-center justify-between">
-			<h2 class="text-lg font-semibold">Timeline Viewer</h2>
-			<div class="text-xs text-slate-400">{{ timelineStore.entries.length }} entries</div>
-		</header>
-		<div ref="scrollContainer" class="h-[560px] overflow-auto rounded border border-slate-800" @scroll="onScroll">
-			<div :style="listStyle">
-				<div
-					v-for="virtual in visibleItems"
-					:key="virtual.index"
-					class="absolute left-0 right-0 px-2"
-					:style="{ top: `${virtual.index * itemHeight}px` }"
-				>
-					<TimelineEntry :entry="virtual.item" />
-				</div>
-			</div>
+	<section class="q-gutter-sm">
+		<div class="row items-center justify-between">
+			<div class="text-subtitle1 text-weight-medium">Timeline Viewer</div>
+			<q-badge color="primary">{{ timelineStore.entries.length }} entries</q-badge>
 		</div>
-		<p class="text-xs text-slate-400">Rendered from index {{ startIndex }} with virtual scrolling.</p>
+
+		<q-card flat bordered>
+			<q-card-section class="q-pa-none">
+				<div ref="scrollContainer" class="timeline-scroll" @scroll="onScroll">
+					<div :style="listStyle">
+						<div
+							v-for="virtual in visibleItems"
+							:key="virtual.index"
+							class="absolute left-0 right-0 q-px-sm"
+							:style="{ top: `${virtual.index * itemHeight}px` }"
+						>
+							<TimelineEntry :entry="virtual.item" />
+						</div>
+					</div>
+				</div>
+			</q-card-section>
+		</q-card>
+
+		<div class="text-caption text-grey-7">Rendered from index {{ startIndex }} with virtual scrolling.</div>
 	</section>
 </template>
+
+<style scoped>
+.timeline-scroll {
+	height: 560px;
+	overflow: auto;
+}
+</style>

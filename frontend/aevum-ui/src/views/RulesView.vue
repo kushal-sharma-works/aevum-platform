@@ -13,8 +13,8 @@ onMounted(async () => {
 
 <template>
 	<PageContainer title="Rules" description="Rule version browser">
-		<div class="mb-2">
-			<RouterLink to="/rules/create" class="text-sm text-blue-300">Create Rule</RouterLink>
+		<div class="q-mb-sm">
+			<q-btn color="primary" icon="add" label="Create Rule" to="/rules/create" />
 		</div>
 		<RuleList :rules="rulesStore.rules" />
 	</PageContainer>

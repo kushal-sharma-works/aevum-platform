@@ -12,15 +12,13 @@ onMounted(async () => {
 
 <template>
 	<PageContainer title="Events" description="Stream events with cursor pagination">
-		<div class="space-y-2">
-			<RouterLink
-				v-for="event in eventsStore.events"
-				:key="event.eventId"
-				:to="`/events/${event.eventId}`"
-				class="block rounded border border-slate-800 p-2"
-			>
-				{{ event.eventType }} — {{ event.eventId }}
-			</RouterLink>
-		</div>
+		<q-list bordered separator>
+			<q-item v-for="event in eventsStore.events" :key="event.eventId" :to="`/events/${event.eventId}`" clickable>
+				<q-item-section>
+					<q-item-label class="text-weight-medium">{{ event.eventType }}</q-item-label>
+					<q-item-label caption>{{ event.eventId }}</q-item-label>
+				</q-item-section>
+			</q-item>
+		</q-list>
 	</PageContainer>
 </template>

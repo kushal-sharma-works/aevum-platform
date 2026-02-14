@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-NAMESPACE="${1:-aevum-dev}"
+NAMESPACE="${1:-aevum-sit}"
 
 echo "Port-forwarding Aevum services from namespace: $NAMESPACE"
 

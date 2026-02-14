@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
-import MetricCard from './MetricCard.vue'
 
 const totals = ref({
 	events: 0,
@@ -33,17 +32,52 @@ onUnmounted(() => {
 </script>
 
 <template>
-	<section class="space-y-4">
-		<div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-			<MetricCard label="Total Events" :value="totals.events" />
-			<MetricCard label="Total Decisions" :value="totals.decisions" />
-			<MetricCard label="Active Rules" :value="totals.activeRules" />
-			<MetricCard label="Avg Latency" :value="`${totals.avgLatency}ms`" />
+	<section class="q-gutter-md">
+		<div class="row q-col-gutter-md">
+			<div class="col-12 col-sm-6 col-lg-3">
+				<q-card flat bordered>
+					<q-card-section>
+						<div class="text-caption text-grey-7">Total Events</div>
+						<div class="text-h6">{{ totals.events }}</div>
+					</q-card-section>
+				</q-card>
+			</div>
+			<div class="col-12 col-sm-6 col-lg-3">
+				<q-card flat bordered>
+					<q-card-section>
+						<div class="text-caption text-grey-7">Total Decisions</div>
+						<div class="text-h6">{{ totals.decisions }}</div>
+					</q-card-section>
+				</q-card>
+			</div>
+			<div class="col-12 col-sm-6 col-lg-3">
+				<q-card flat bordered>
+					<q-card-section>
+						<div class="text-caption text-grey-7">Active Rules</div>
+						<div class="text-h6">{{ totals.activeRules }}</div>
+					</q-card-section>
+				</q-card>
+			</div>
+			<div class="col-12 col-sm-6 col-lg-3">
+				<q-card flat bordered>
+					<q-card-section>
+						<div class="text-caption text-grey-7">Avg Latency</div>
+						<div class="text-h6">{{ totals.avgLatency }}ms</div>
+					</q-card-section>
+				</q-card>
+			</div>
 		</div>
-		<div class="grid gap-3 md:grid-cols-3">
-			<div class="rounded border border-slate-800 p-3 text-sm">IngestionRateChart placeholder</div>
-			<div class="rounded border border-slate-800 p-3 text-sm">DecisionLatencyChart placeholder</div>
-			<div class="rounded border border-slate-800 p-3 text-sm">ErrorRateChart placeholder</div>
+
+		<div class="row q-col-gutter-md">
+			<div class="col-12 col-md-4">
+				<q-banner rounded class="bg-blue-1 text-blue-9">IngestionRateChart placeholder</q-banner>
+			</div>
+			<div class="col-12 col-md-4">
+				<q-banner rounded class="bg-teal-1 text-teal-9">DecisionLatencyChart placeholder</q-banner>
+			</div>
+			<div class="col-12 col-md-4">
+				<q-banner rounded class="bg-orange-1 text-orange-9">ErrorRateChart placeholder</q-banner>
+			</div>
 		</div>
 	</section>
 </template>
