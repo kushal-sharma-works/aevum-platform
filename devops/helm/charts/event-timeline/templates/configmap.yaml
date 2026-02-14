@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "event-timeline.fullname" . }}
+  labels:
+    {{- include "event-timeline.labels" . | nindent 4 }}
+data:
+  AEVUM_LOG_LEVEL: "{{ .Values.config.logLevel }}"
+  AEVUM_DYNAMODB_TABLE: "{{ .Values.config.dynamodbTable }}"
+  AEVUM_AWS_REGION: "{{ .Values.config.awsRegion }}"
+  AEVUM_OTEL_ENDPOINT: "{{ .Values.config.otelEndpoint }}"
+  AEVUM_RATE_LIMIT_BURST: "{{ .Values.config.rateLimitBurst }}"
+  AEVUM_RATE_LIMIT_RATE: "{{ .Values.config.rateLimitRate }}"
+

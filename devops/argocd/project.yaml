@@ -1,0 +1,18 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: aevum
+  namespace: argocd
+spec:
+  description: Aevum Platform
+  sourceRepos:
+    - https://github.com/kushal-sharma-works/aevum-platform.git
+  destinations:
+    - namespace: aevum-*
+      server: https://kubernetes.default.svc
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+  namespaceResourceWhitelist:
+    - group: "*"
+      kind: "*"

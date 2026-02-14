@@ -1,0 +1,4 @@
+replicaCount: 2
+image:
+  repository: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/aevum-decision-engine-staging
+  tag: latest

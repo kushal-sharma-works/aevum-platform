@@ -1,0 +1,150 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      event-timeline: ${{ steps.changes.outputs.event-timeline }}
+      decision-engine: ${{ steps.changes.outputs.decision-engine }}
+      query-audit: ${{ steps.changes.outputs.query-audit }}
+      frontend: ${{ steps.changes.outputs.frontend }}
+      infra: ${{ steps.changes.outputs.infra }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: changes
+        with:
+          filters: |
+            event-timeline:
+              - 'services/event-timeline/**'
+            decision-engine:
+              - 'services/decision-engine/**'
+            query-audit:
+              - 'services/query-audit/**'
+            frontend:
+              - 'frontend/**'
+            infra:
+              - 'devops/pulumi/**'
+
+  lint-test-event-timeline:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.event-timeline == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/event-timeline
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: services/event-timeline/go.sum
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: services/event-timeline
+      - run: go test ./... -v -race -coverprofile=coverage.out
+
+  lint-test-decision-engine:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.decision-engine == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/decision-engine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+      - run: dotnet restore DecisionEngine.sln
+      - run: dotnet build DecisionEngine.sln --no-restore -c Release -warnaserror
+      - run: dotnet test DecisionEngine.sln --no-build -c Release --collect:'XPlat Code Coverage' --results-directory ./coverage
+
+  lint-test-query-audit:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.query-audit == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/query-audit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+          cache-dependency-path: services/query-audit/go.sum
+      - uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: services/query-audit
+      - run: go test ./... -v -race -coverprofile=coverage.out
+
+  lint-test-frontend:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend/aevum-ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/aevum-ui/package-lock.json
+      - run: npm ci
+      - run: npm run type-check
+      - run: npm run lint
+      - run: npm run test:coverage
+
+  build-images:
+    needs: [lint-test-event-timeline, lint-test-decision-engine, lint-test-query-audit, lint-test-frontend]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: event-timeline
+            context: services/event-timeline
+            dockerfile: services/event-timeline/Dockerfile
+          - service: decision-engine
+            context: services/decision-engine
+            dockerfile: services/decision-engine/Dockerfile
+          - service: query-audit
+            context: services/query-audit
+            dockerfile: services/query-audit/Dockerfile
+          - service: aevum-ui
+            context: frontend/aevum-ui
+            dockerfile: frontend/aevum-ui/Dockerfile
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-central-1
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ${{ steps.ecr.outputs.registry }}/aevum-${{ matrix.service }}:${{ github.sha }}
+            ${{ steps.ecr.outputs.registry }}/aevum-${{ matrix.service }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

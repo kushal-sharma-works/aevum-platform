@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aevum-sit
+  labels:
+    environment: sit
+    project: aevum
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aevum-monitoring
+  labels:
+    environment: shared
+    project: aevum

@@ -16,3 +16,13 @@
 node_modules/
 bin/
 obj/
+
+# Test and coverage artifacts
+coverage/
+coverage-final/
+*.out
+
+# Frontend outputs
+frontend/aevum-ui/node_modules/
+frontend/aevum-ui/dist/
+frontend/aevum-ui/coverage/

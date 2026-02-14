@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: event-timeline
+  namespace: aevum-sit
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: event-timeline
+  template:
+    metadata:
+      labels:
+        app: event-timeline
+    spec:
+      containers:
+        - name: event-timeline
+          image: ghcr.io/kushal-sharma-works/aevum-event-timeline:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+            - containerPort: 9090
+          envFrom:
+            - configMapRef:
+                name: aevum-config
+            - secretRef:
+                name: aevum-secrets
+          readinessProbe:
+            httpGet:
+              path: /admin/ready
+              port: 9090
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /admin/health
+              port: 9090
+            initialDelaySeconds: 20
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: event-timeline
+  namespace: aevum-sit
+spec:
+  selector:
+    app: event-timeline
+  ports:
+    - name: public
+      port: 8080
+      targetPort: 8080
+    - name: admin
+      port: 9090
+      targetPort: 9090

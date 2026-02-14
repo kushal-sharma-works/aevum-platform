@@ -1,0 +1,65 @@
+replicaCount: 2
+image:
+  repository: ""
+  tag: latest
+  pullPolicy: IfNotPresent
+nameOverride: ""
+fullnameOverride: ""
+serviceAccount:
+  create: true
+  annotations: {}
+  name: event-timeline
+service:
+  type: ClusterIP
+  publicPort: 8080
+  adminPort: 9090
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: api.aevum.local
+      paths:
+        - path: /
+          pathType: Prefix
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+livenessProbe:
+  httpGet:
+    path: /admin/health
+    port: admin
+  initialDelaySeconds: 10
+  periodSeconds: 15
+readinessProbe:
+  httpGet:
+    path: /admin/ready
+    port: admin
+  initialDelaySeconds: 5
+  periodSeconds: 10
+config:
+  logLevel: info
+  dynamodbTable: aevum-events
+  awsRegion: eu-central-1
+  otelEndpoint: otel-collector:4317
+  rateLimitBurst: "100"
+  rateLimitRate: "50"
+secret:
+  jwtSecret: ""
+networkPolicy:
+  enabled: true
+serviceMonitor:
+  enabled: true
+  interval: 15s
+  path: /admin/metrics
+  port: admin

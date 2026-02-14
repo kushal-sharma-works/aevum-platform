@@ -1,0 +1,3 @@
+name: aevum
+runtime: nodejs
+description: Aevum platform infrastructure on AWS using Pulumi TypeScript

@@ -1,0 +1,10 @@
+config:
+  aws:region: eu-central-1
+  aevum:vpcCidr: 10.2.0.0/16
+  aevum:eksNodeCount: 3
+  aevum:eksInstanceType: m5.xlarge
+  aevum:opensearchInstanceType: r6g.large.search
+  aevum:opensearchInstanceCount: 3
+  aevum:docdbInstanceType: db.r6g.large
+  aevum:docdbInstanceCount: 3
+  aevum:natGatewayCount: 3

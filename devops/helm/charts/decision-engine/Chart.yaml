@@ -1,0 +1,6 @@
+apiVersion: v2
+name: decision-engine
+description: Aevum decision-engine service chart
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
