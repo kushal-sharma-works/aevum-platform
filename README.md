@@ -17,6 +17,8 @@ The system is designed around immutable event ingestion, deterministic decision 
 	- `devops/k8s/` – Base namespaces, quotas, and limit ranges
 	- `devops/scripts/` – Local setup, seed, and cluster port-forward helpers
 
+Additional local/SIT runbook: `devops/README.md`
+
 ## Local Development Workflow
 
 Use the root Makefile and Docker Compose stack for one-command local setup.

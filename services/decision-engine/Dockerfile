@@ -4,7 +4,7 @@ WORKDIR /src
 
 # Copy solution and project files
 COPY DecisionEngine.sln ./
-COPY src/Aevem.DecisionEngine.Api/Aevum.DecisionEngine.Api.csproj src/Aevum.DecisionEngine.Api/
+COPY src/Aevum.DecisionEngine.Api/Aevum.DecisionEngine.Api.csproj src/Aevum.DecisionEngine.Api/
 COPY src/Aevum.DecisionEngine.Domain/Aevum.DecisionEngine.Domain.csproj src/Aevum.DecisionEngine.Domain/
 COPY src/Aevum.DecisionEngine.Application/Aevum.DecisionEngine.Application.csproj src/Aevum.DecisionEngine.Application/
 COPY src/Aevum.DecisionEngine.Infrastructure/Aevum.DecisionEngine.Infrastructure.csproj src/Aevum.DecisionEngine.Infrastructure/
