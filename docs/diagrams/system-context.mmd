@@ -1,0 +1,9 @@
+flowchart TB
+    User[Users]
+    Producer[External Event Producers]
+    Aevum[Aevum Platform]
+    AWS[AWS Managed Services]
+
+    User -->|Investigate, replay, audit| Aevum
+    Producer -->|Publish domain events| Aevum
+    Aevum -->|Runs on| AWS

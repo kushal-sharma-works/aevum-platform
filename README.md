@@ -1,92 +1,224 @@
 # Aevum
 
-Aevum is a distributed, deterministic, time-aware decision platform.
+**A distributed, deterministic, time-aware decision platform.**
 
-The system is designed around immutable event ingestion, deterministic decision evaluation, and historical replay for auditability and analysis.
+Aevum enables organizations to make decisions in real time, then deterministically replay, audit, and simulate those decisions as if they happened at any point in the past.
+It combines immutable event ingestion, versioned rules, and traceable decision outputs to answer not only what happened, but why it happened.
 
-## Repository Structure
+> Most systems only answer: "What is the current state?"
+> Aevum answers: "What was the state at time T? Why was that decision made? What would have happened if the rules were different?"
 
-- `services/` – Backend microservices (Go, .NET)
-- `frontend/` – Web UI (Vue + TypeScript)
-	- `frontend/aevum-ui/` – Vue 3 + TypeScript + Pinia + Vite frontend
-- `devops/` – Infrastructure and platform operations
-	- `devops/pulumi/` – Pulumi TypeScript IaC for AWS
-	- `devops/helm/` – Helm charts for all services + umbrella chart
-	- `devops/argocd/` – ArgoCD project, applications, and applicationset
-	- `devops/monitoring/` – OTel, Prometheus, and Grafana provisioning
-	- `devops/k8s/` – Base namespaces, quotas, and limit ranges
-	- `devops/scripts/` – Local setup, seed, and cluster port-forward helpers
+```mermaid
+flowchart LR
+	Browser[User / Browser]
+	Frontend[Frontend\nVue 3 + TypeScript]
+	ET[Event Timeline Service\nGo Gin+Echo]
+	DE[Decision Engine\n.NET 9]
+	QA[Query & Audit Service\nGo Gin]
+	DDB[(DynamoDB)]
+	MDB[(MongoDB / DocumentDB)]
+	ES[(OpenSearch / Elasticsearch)]
+	OTel[OTel Collector]
+	Prom[(Prometheus)]
+	Graf[(Grafana)]
 
-Additional local/SIT runbook: `devops/README.md`
+	Browser --> Frontend
+	Frontend --> ET
+	Frontend --> DE
+	Frontend --> QA
 
-## Local Development Workflow
+	ET --> DDB
+	DE --> MDB
+	DE --> ET
+	QA --> ET
+	QA --> DE
+	QA --> ES
 
-Use the root Makefile and Docker Compose stack for one-command local setup.
+	ET --> OTel
+	DE --> OTel
+	QA --> OTel
+	OTel --> Prom
+	Prom --> Graf
+```
+
+## Why Aevum?
+
+| Problem | How Aevum Solves It |
+|---------|-------------------|
+| Decisions are opaque — no one knows *why* something happened | Every decision stores a full evaluation trace: input event, rule version, condition-by-condition results, final output |
+| Systems lose history — state is overwritten | Events are immutable. Rules are versioned. Decisions are permanent. Nothing is ever deleted or mutated. |
+| Replay is approximate or impossible | Deterministic evaluation guarantees: same event + same rule version + same timestamp = identical output. Every time. |
+| Debugging production issues requires guesswork | Full observability: distributed tracing (OpenTelemetry), structured logging, Prometheus metrics, Grafana dashboards, audit trails |
+
+## Architecture
+
+```mermaid
+flowchart TD
+	Client[Client / Browser] --> UI[Frontend (Vue)]
+	UI --> ET[Event Timeline Service]
+	UI --> DE[Decision Engine]
+	UI --> QA[Query & Audit Service]
+
+	ET --> DDB[(DynamoDB)]
+	DE --> MDB[(MongoDB)]
+	QA --> ES[(Elasticsearch / OpenSearch)]
+
+	DE -->|HTTP| ET
+	QA -->|HTTP| ET
+	QA -->|HTTP| DE
+
+	ET --> OTel[OTel Collector]
+	DE --> OTel
+	QA --> OTel
+	OTel --> Prom[Prometheus]
+	Prom --> Graf[Grafana]
+```
+
+### Services
+
+| Service | Language | Purpose | Database | Port |
+|---------|----------|---------|----------|------|
+| Event Timeline | Go 1.22 (Gin + Echo) | Event ingestion, ordering, replay streaming | DynamoDB | 8080, 9090 |
+| Decision Engine | C# .NET 9 | Deterministic rule evaluation, versioned decisions | MongoDB | 8081 |
+| Query & Audit | Go 1.22 (Gin) | Temporal search, correlation, diffing, audit trails | Elasticsearch | 8082 |
+| Frontend | Vue 3.5 + TypeScript 5.6 | Timeline viewer, decision inspector, replay console | — | 3000 |
+
+Note: Monitoring endpoints are exposed separately (Prometheus `9090`, Grafana `3001`).
+
+### Tech Stack
+
+| Layer | Technology | Version | Why |
+|-------|-----------|---------|-----|
+| Backend (events) | Go, Gin, Echo | 1.22 | Concurrency, throughput, goroutine-based replay |
+| Backend (decisions) | C#, .NET, ASP.NET Core | 9.0 | Type safety, deterministic business logic |
+| Frontend | Vue, TypeScript, Pinia, Vite | 3.5, 5.6, 2.2, 6.0 | Composition API, strict typing, reactive state |
+| Event Store | DynamoDB | — | Immutable append-only model with GSIs |
+| Rule Store | MongoDB (DocumentDB in AWS) | 7.0 | Flexible rule schema + version retention |
+| Search | Elasticsearch (OpenSearch) | 8.15 | Temporal and full-text querying |
+| Container Orchestration | Kubernetes (EKS) | 1.31 | Production orchestration and scaling |
+| IaC | Pulumi (TypeScript) | — | Type-safe multi-environment infrastructure |
+| CI/CD | GitHub Actions + GitLab CI | — | Cross-platform pipeline portability |
+| GitOps | ArgoCD | — | Declarative deployment + self-heal |
+| Packaging | Docker, Helm | — | Reproducible builds and templated deploys |
+| Observability | OpenTelemetry, Prometheus, Grafana | — | Tracing, metrics, dashboards |
+| Cloud | AWS (EKS, DynamoDB, OpenSearch, Lambda, SQS, S3, CloudFront) | — | Managed, scalable cloud primitives |
+
+## Quick Start
+
+### Prerequisites
+
+- Docker + Docker Compose
+- Go 1.22+
+- .NET 9 SDK
+- Node.js 22+
+- AWS CLI (for local DynamoDB setup)
+
+### Run Everything Locally
 
 ```bash
 make dev
 ```
 
-This starts:
+This starts all services, databases, and monitoring.
 
-- Event Timeline: `http://localhost:8080` (admin mapped to `9091`)
-- Decision Engine: `http://localhost:8081`
-- Query & Audit: `http://localhost:8082`
-- Frontend: `http://localhost:3000`
-- Prometheus: `http://localhost:9090`
-- Grafana: `http://localhost:3001` (`admin/admin`)
+| URL | Service |
+|-----|---------|
+| http://localhost:3000 | Frontend |
+| http://localhost:8080 | Event Timeline API |
+| http://localhost:8081 | Decision Engine API |
+| http://localhost:8082 | Query & Audit API |
+| http://localhost:9090 | Prometheus |
+| http://localhost:3001 | Grafana (`admin/admin`) |
 
-Useful commands:
+Seed test data:
 
 ```bash
-make dev-down
-make test
-make lint
-make build
 make seed
 ```
 
-Optional helper scripts:
+Run all tests:
 
 ```bash
-bash devops/scripts/local-setup.sh
-bash devops/scripts/seed-data.sh
-bash devops/scripts/port-forward.sh aevum-sit
+make test
 ```
 
-## CI/CD Strategy
+## Core Concepts
 
-GitHub Actions workflows are in `.github/workflows/`:
+### Immutable Events
 
-- `ci.yml` – change-aware lint/test/build workflow
-- `pr-check.yml` – Helm + Argo manifest validation and rendering checks
-- `cd-sit.yml` – updates `values-sit.yaml` image tags on main for SIT deployment
-- `deploy-sit-manual.yml` – manual branch-based deploy to SIT from GitHub Actions UI
-- `infra.yml` – Pulumi preview on PR and Pulumi up on main
+Events represent facts that happened in time. Once ingested, events are never updated; they are only read, replayed, and correlated. Per-stream sequence numbers enforce stable ordering.
 
-GitLab parity pipeline exists in `.gitlab-ci.yml` with equivalent stages for lint, test, build, and deploy.
+### Deterministic Decisions
 
-ArgoCD pulls desired state from repo manifests under `devops/argocd/` and deploys Helm charts from `devops/helm/charts/` into a single Kubernetes application namespace: `aevum-sit`.
+The Decision Engine evaluates versioned rules against input context and stores a complete trace of each condition/action path. Given equivalent inputs and rule version, outcomes are deterministic.
 
-Manual deploy option (branch-select + click deploy):
+### Time Travel & Replay
 
-1. Open GitHub Actions → `Deploy SIT (Manual)`
-2. Select the branch in the Run workflow dialog
-3. Click `Run workflow` (optional: provide `image_tag`)
+Replay re-processes historical event streams from selected time windows and verifies deterministic outputs. This allows incident reconstruction and pre-production simulation for rule changes.
 
-This workflow builds images from the selected branch commit and deploys them to `aevum-sit` via Helm.
+### Audit Trail
 
-## Monitoring Setup
+Each decision links to the triggering event, the rule version used, full evaluation trace, and final output. Query & Audit provides temporal search, cross-service correlation, and decision diffing.
 
-- OpenTelemetry Collector config: `devops/monitoring/otel-collector-config.yaml`
-- Prometheus local scrape + rules: `devops/monitoring/prometheus/`
-- Grafana datasource/provider + dashboards: `devops/monitoring/grafana/`
+## Documentation
 
-Dashboards include:
+- [Architecture](docs/architecture.md)
+- [Event Timeline OpenAPI](docs/api/event-timeline-openapi.yaml)
+- [Decision Engine OpenAPI](docs/api/decision-engine-openapi.yaml)
+- [Query & Audit OpenAPI](docs/api/query-audit-openapi.yaml)
+- [ADRs](docs/adr)
+- [Replay Model](docs/replay-model.md)
+- [Data Model](docs/data-model.md)
+- [Deployment Guide](docs/deployment-guide.md)
+- [Local Development](docs/local-development.md)
+- [Runbook](docs/runbook.md)
 
-- Aevum overview
-- Event Timeline service metrics
-- Decision Engine service metrics
-- Query & Audit service metrics
-- Kubernetes infrastructure metrics
+## Project Structure
+
+```text
+aevum-platform/
+├── services/
+│   ├── event-timeline/       # Go — event ingestion, storage, replay
+│   ├── decision-engine/      # C# .NET 9 — rule evaluation, decisions
+│   └── query-audit/          # Go — search, correlation, audit
+├── frontend/
+│   └── aevum-ui/             # Vue 3 + TypeScript — platform UI
+├── devops/
+│   ├── pulumi/               # AWS infrastructure (TypeScript)
+│   ├── helm/                 # Kubernetes Helm charts
+│   ├── argocd/               # GitOps application manifests
+│   ├── monitoring/           # Prometheus, Grafana, OTel configs
+│   ├── k8s/                  # Base Kubernetes manifests
+│   └── scripts/              # Setup, seed, and utility scripts
+├── docs/                     # Architecture, ADRs, API specs, guides
+├── .github/workflows/        # GitHub Actions CI/CD
+├── .gitlab-ci.yml            # GitLab CI equivalent
+├── docker-compose.yml        # Full local development environment
+└── Makefile                  # Root-level commands
+```
+
+## Architecture Decision Records
+
+| ADR | Topic | Summary |
+|-----|-------|---------|
+| [ADR-001](docs/adr/001-monorepo-strategy.md) | Monorepo Strategy | Use one repository for services, frontend, and infrastructure to enable atomic changes |
+| [ADR-002](docs/adr/002-language-selection.md) | Language Selection | Go for event ingestion/replay; C# for deterministic decision domain modeling |
+| [ADR-003](docs/adr/003-database-selection.md) | Database Selection | Use DynamoDB, MongoDB, and Elasticsearch for distinct access patterns |
+| [ADR-004](docs/adr/004-event-ordering-and-idempotency.md) | Ordering + Idempotency | Per-stream sequencing and idempotency keys prevent duplicates and preserve order |
+| [ADR-005](docs/adr/005-replay-determinism.md) | Replay Determinism | Deterministic contract and hash verification for replay correctness |
+| [ADR-006](docs/adr/006-authentication-strategy.md) | Authentication | JWT for public APIs, network-isolated admin plane |
+| [ADR-007](docs/adr/007-observability-strategy.md) | Observability | OpenTelemetry + Prometheus + Grafana with correlated structured logs |
+| [ADR-008](docs/adr/008-infrastructure-as-code-choice.md) | IaC Choice | Pulumi TypeScript for type-safe, programmable infrastructure |
+
+## What I Would Do Differently / If I Had More Time
+
+- Introduce gRPC for internal service-to-service contracts and stronger interface evolution.
+- Add an event schema registry with compatibility enforcement and payload version migration tooling.
+- Implement Playwright end-to-end tests for critical frontend and replay workflows.
+- Formalize CQRS boundaries with dedicated read models for heavy audit/search workloads.
+- Add chaos experiments (pod kill, packet loss, dependency latency) to validate resilience claims.
+
+## License
+
+MIT
 

@@ -1,0 +1,44 @@
+flowchart TB
+    subgraph AWS[AWS Region]
+      subgraph VPC[VPC]
+        ALB[Application Load Balancer]
+
+        subgraph Public[Public Subnets]
+          NAT[NAT Gateway]
+        end
+
+        subgraph Private[Private Subnets]
+          EKS[EKS Cluster]
+          NG[Managed Node Groups]
+          OTel[OTel Collector]
+          Prom[Prometheus]
+          Graf[Grafana]
+        end
+
+        DDB[(DynamoDB)]
+        DOCDB[(DocumentDB/MongoDB)]
+        OS[(OpenSearch)]
+        SQS[(SQS)]
+        Lambda[Lambda]
+        S3[(S3)]
+        CF[CloudFront]
+        ECR[(ECR)]
+      end
+    end
+
+    Internet[Users] --> CF
+    CF --> S3
+    Internet --> ALB
+    ALB --> EKS
+    EKS --> NG
+    EKS --> DDB
+    EKS --> DOCDB
+    EKS --> OS
+    EKS --> SQS
+    DDB --> Lambda
+    Lambda --> SQS
+    EKS --> OTel
+    OTel --> Prom
+    Prom --> Graf
+    ECR --> EKS
+    Private --> NAT

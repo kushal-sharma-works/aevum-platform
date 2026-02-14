@@ -1,0 +1,389 @@
+openapi: 3.1.0
+info:
+  title: Aevum Decision Engine API
+  version: 1.0.0
+  description: API for deterministic rule evaluation, decision retrieval, and rule lifecycle management.
+servers:
+  - url: http://localhost:8081
+    description: Local development
+paths:
+  /api/v1/evaluate:
+    post:
+      summary: Evaluate a decision
+      operationId: evaluateDecision
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluateRequest'
+      responses:
+        '200':
+          description: Decision evaluated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluationResponse'
+        '400':
+          description: Validation failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+        '404':
+          description: Rule not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+  /api/v1/decisions:
+    get:
+      summary: List decisions
+      operationId: listDecisions
+      parameters:
+        - name: streamId
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        '200':
+          description: Paginated decision list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponseDecision'
+  /api/v1/decisions/{id}:
+    get:
+      summary: Get decision by ID
+      operationId: getDecisionById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Decision found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Decision'
+        '404':
+          description: Decision not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+  /api/v1/rules:
+    post:
+      summary: Create rule
+      operationId: createRule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRuleRequest'
+      responses:
+        '201':
+          description: Rule created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '400':
+          description: Validation failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+    get:
+      summary: List active rules
+      operationId: listRules
+      responses:
+        '200':
+          description: Active rules
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Rule'
+  /api/v1/rules/{id}/versions:
+    get:
+      summary: List rule versions
+      operationId: listRuleVersions
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Rule versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Rule'
+  /api/v1/rules/{id}/versions/{version}/deactivate:
+    put:
+      summary: Deactivate a rule version
+      operationId: deactivateRuleVersion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: version
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Rule version deactivated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rule'
+        '404':
+          description: Rule or version not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+components:
+  schemas:
+    EvaluateRequest:
+      type: object
+      properties:
+        eventId:
+          type: string
+        event:
+          type: object
+          additionalProperties: true
+        ruleId:
+          type: string
+        ruleVersion:
+          type: integer
+      anyOf:
+        - required: [eventId]
+        - required: [event]
+    EvaluationResponse:
+      type: object
+      required: [decision, trace]
+      properties:
+        decision:
+          $ref: '#/components/schemas/Decision'
+        trace:
+          $ref: '#/components/schemas/DecisionTrace'
+    Decision:
+      type: object
+      required:
+        - id
+        - eventId
+        - streamId
+        - ruleId
+        - ruleVersion
+        - status
+        - output
+        - evaluatedAt
+        - deterministicHash
+      properties:
+        id:
+          type: string
+        eventId:
+          type: string
+        streamId:
+          type: string
+        ruleId:
+          type: string
+        ruleVersion:
+          type: integer
+        status:
+          type: string
+          enum: [Approved, Rejected, ManualReview, NoMatch]
+        output:
+          type: object
+          additionalProperties: true
+        evaluatedAt:
+          type: string
+          format: date-time
+        deterministicHash:
+          type: string
+    DecisionTrace:
+      type: object
+      required: [steps]
+      properties:
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/TraceStep'
+    TraceStep:
+      type: object
+      required: [step, field, operator, matched]
+      properties:
+        step:
+          type: integer
+        field:
+          type: string
+        operator:
+          type: string
+        expected:
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: array
+            - type: object
+        actual:
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: array
+            - type: object
+        matched:
+          type: boolean
+        message:
+          type: string
+    Rule:
+      type: object
+      required: [id, version, name, conditions, actions, isActive]
+      properties:
+        id:
+          type: string
+        version:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleCondition'
+        actions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleAction'
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+    RuleCondition:
+      type: object
+      required: [field, operator, value]
+      properties:
+        field:
+          type: string
+        operator:
+          type: string
+        value:
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: array
+            - type: object
+        logicalOperator:
+          type: string
+          enum: [And, Or]
+        nestedConditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/RuleCondition'
+    RuleAction:
+      type: object
+      required: [type, order, parameters]
+      properties:
+        type:
+          type: string
+        order:
+          type: integer
+        parameters:
+          type: object
+          additionalProperties: true
+        description:
+          type: string
+    CreateRuleRequest:
+      type: object
+      required: [name, conditions, actions]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        conditions:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/RuleCondition'
+        actions:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/RuleAction'
+        priority:
+          type: integer
+    PaginatedResponseDecision:
+      type: object
+      required: [items, page, pageSize, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Decision'
+        page:
+          type: integer
+        pageSize:
+          type: integer
+        total:
+          type: integer
+    ProblemDetails:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+        errors:
+          type: object
+          additionalProperties: true

@@ -1,0 +1,311 @@
+openapi: 3.1.0
+info:
+  title: Aevum Query & Audit API
+  version: 1.0.0
+  description: API for temporal search, correlation, decision diffing, and audit trail retrieval.
+servers:
+  - url: http://localhost:8082
+    description: Local development
+paths:
+  /api/v1/search:
+    get:
+      summary: Search events and decisions
+      operationId: search
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [event, decision, all]
+            default: all
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SearchResult'
+  /api/v1/timeline:
+    get:
+      summary: Retrieve timeline entries
+      operationId: getTimeline
+      parameters:
+        - name: stream_id
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [event, decision, all]
+            default: all
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+      responses:
+        '200':
+          description: Timeline page
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TimelineEntry'
+  /api/v1/correlate:
+    get:
+      summary: Correlate records by rule/event context
+      operationId: correlate
+      parameters:
+        - name: rule_id
+          in: query
+          schema:
+            type: string
+        - name: rule_version
+          in: query
+          schema:
+            type: integer
+        - name: event_id
+          in: query
+          schema:
+            type: string
+        - name: stream_id
+          in: query
+          schema:
+            type: string
+        - name: event_type
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Correlated entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CorrelationResult'
+  /api/v1/diff:
+    get:
+      summary: Compute decision/rule diffs
+      operationId: diff
+      parameters:
+        - name: stream_id
+          in: query
+          schema:
+            type: string
+        - name: t1
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: t2
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: rule_id
+          in: query
+          schema:
+            type: string
+        - name: v1
+          in: query
+          schema:
+            type: integer
+        - name: v2
+          in: query
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Diff output
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiffResult'
+  /api/v1/audit/{decisionId}:
+    get:
+      summary: Get complete audit trail for a decision
+      operationId: getAuditTrail
+      parameters:
+        - name: decisionId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Audit trail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditTrail'
+        '404':
+          description: Decision not found
+components:
+  schemas:
+    SearchResult:
+      type: object
+      required: [id, type, timestamp, summary]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [event, decision]
+        timestamp:
+          type: string
+          format: date-time
+        summary:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+    TimelineEntry:
+      type: object
+      required: [stream_id, type, timestamp, id]
+      properties:
+        stream_id:
+          type: string
+        type:
+          type: string
+          enum: [event, decision]
+        timestamp:
+          type: string
+          format: date-time
+        id:
+          type: string
+        data:
+          type: object
+          additionalProperties: true
+    CorrelationResult:
+      type: object
+      required: [events, decisions]
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResult'
+        decisions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResult'
+    DiffResult:
+      type: object
+      required: [mode, entries]
+      properties:
+        mode:
+          type: string
+          enum: [stream-time, rule-version]
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/DiffEntry'
+    DiffEntry:
+      type: object
+      required: [field, before, after, changed]
+      properties:
+        field:
+          type: string
+        before:
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: object
+            - type: array
+            - type: 'null'
+        after:
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: object
+            - type: array
+            - type: 'null'
+        changed:
+          type: boolean
+    AuditTrail:
+      type: object
+      required: [decision_id, event_id, rule_id, rule_version, steps]
+      properties:
+        decision_id:
+          type: string
+        event_id:
+          type: string
+        rule_id:
+          type: string
+        rule_version:
+          type: integer
+        evaluated_at:
+          type: string
+          format: date-time
+        deterministic_hash:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditStep'
+    AuditStep:
+      type: object
+      required: [index, description, outcome]
+      properties:
+        index:
+          type: integer
+        description:
+          type: string
+        outcome:
+          type: string
+        details:
+          type: object
+          additionalProperties: true

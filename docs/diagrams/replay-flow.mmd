@@ -1,0 +1,22 @@
+sequenceDiagram
+    participant C as Client
+    participant ET as Event Timeline
+    participant DDB as DynamoDB
+    participant DE as Decision Engine
+    participant MDB as MongoDB
+
+    C->>ET: POST /admin/replay {stream_id, from, to}
+    ET->>DDB: Query ordered events by stream/time
+    DDB-->>ET: Event sequence
+    loop for each event
+        ET->>DE: POST /api/v1/evaluate
+        DE->>MDB: Lookup existing decision
+        alt decision exists
+            MDB-->>DE: Existing decision
+        else no decision
+            DE->>MDB: Persist new deterministic decision
+        end
+        DE-->>ET: Decision + deterministic hash
+        ET-->>C: SSE replay result chunk
+    end
+    ET-->>C: Replay complete

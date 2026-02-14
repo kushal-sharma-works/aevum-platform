@@ -1,0 +1,268 @@
+openapi: 3.1.0
+info:
+  title: Aevum Event Timeline API
+  version: 1.0.0
+  description: API for immutable event ingestion, stream pagination, and replay-ready event retrieval.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+security:
+  - BearerAuth: []
+paths:
+  /api/v1/events:
+    post:
+      summary: Ingest a single event
+      operationId: ingestEvent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestEventRequest'
+      responses:
+        '201':
+          description: Event created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '200':
+          description: Idempotent duplicate detected; existing event returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Unauthorized
+        '429':
+          description: Rate limited
+  /api/v1/events/batch:
+    post:
+      summary: Ingest events in batch
+      operationId: ingestEventsBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchIngestRequest'
+      responses:
+        '200':
+          description: Batch processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchIngestResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Unauthorized
+        '429':
+          description: Rate limited
+  /api/v1/streams/{streamId}/events:
+    get:
+      summary: List stream events
+      operationId: getStreamEvents
+      parameters:
+        - name: streamId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: direction
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [forward, backward]
+            default: forward
+      responses:
+        '200':
+          description: Cursor paginated event list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CursorPage'
+        '400':
+          description: Invalid query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Unauthorized
+  /api/v1/events/{eventId}:
+    get:
+      summary: Get event by ID
+      operationId: getEventById
+      parameters:
+        - name: eventId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Event found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '404':
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '401':
+          description: Unauthorized
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    IngestEventRequest:
+      type: object
+      required:
+        - stream_id
+        - event_type
+        - payload
+        - idempotency_key
+        - occurred_at
+      properties:
+        stream_id:
+          type: string
+        event_type:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        idempotency_key:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        schema_version:
+          type: integer
+          minimum: 1
+          default: 1
+    Event:
+      type: object
+      required:
+        - event_id
+        - stream_id
+        - sequence_number
+        - event_type
+        - payload
+        - idempotency_key
+        - occurred_at
+        - ingested_at
+      properties:
+        event_id:
+          type: string
+        stream_id:
+          type: string
+        sequence_number:
+          type: integer
+          format: int64
+        event_type:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        idempotency_key:
+          type: string
+        occurred_at:
+          type: string
+          format: date-time
+        ingested_at:
+          type: string
+          format: date-time
+        schema_version:
+          type: integer
+    BatchIngestRequest:
+      type: object
+      required: [events]
+      properties:
+        events:
+          type: array
+          minItems: 1
+          maxItems: 25
+          items:
+            $ref: '#/components/schemas/IngestEventRequest'
+    BatchIngestResponse:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            required: [index, status]
+            properties:
+              index:
+                type: integer
+              status:
+                type: string
+                enum: [created, duplicate, failed]
+              event:
+                $ref: '#/components/schemas/Event'
+              error:
+                $ref: '#/components/schemas/ApiError'
+    CursorPage:
+      type: object
+      required: [data, next_cursor, has_more]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Event'
+        next_cursor:
+          type: string
+          nullable: true
+        has_more:
+          type: boolean
+    ApiError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          additionalProperties: true

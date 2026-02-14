@@ -1,0 +1,37 @@
+flowchart LR
+    Browser[User / Browser]
+    UI[Frontend\nVue + TypeScript]
+    ET[Event Timeline Service\nGo Gin+Echo]
+    DE[Decision Engine\n.NET 9]
+    QA[Query & Audit Service\nGo Gin]
+
+    DDB[(DynamoDB)]
+    MDB[(MongoDB / DocumentDB)]
+    ES[(OpenSearch / Elasticsearch)]
+    Lambda[AWS Lambda]
+    SQS[(SQS)]
+
+    OTel[OTel Collector]
+    Prom[(Prometheus)]
+    Graf[(Grafana)]
+
+    Browser --> UI
+    UI -->|HTTP/JSON| ET
+    UI -->|HTTP/JSON| DE
+    UI -->|HTTP/JSON| QA
+
+    ET -->|AWS SDK| DDB
+    DDB -->|Stream| Lambda
+    Lambda -->|Publish| SQS
+    SQS -->|Consume| DE
+
+    DE -->|Mongo Driver| MDB
+    QA -->|ES Client| ES
+    QA -->|HTTP/JSON| ET
+    QA -->|HTTP/JSON| DE
+
+    ET --> OTel
+    DE --> OTel
+    QA --> OTel
+    OTel --> Prom
+    Prom --> Graf
