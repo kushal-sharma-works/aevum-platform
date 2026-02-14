@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: event-timeline-dev
+  name: event-timeline-sit
   namespace: argocd
   labels:
     app.kubernetes.io/part-of: aevum
@@ -14,10 +14,10 @@ spec:
     helm:
       valueFiles:
         - values.yaml
-        - values-dev.yaml
+        - values-sit.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: aevum-dev
+    namespace: aevum-sit
   syncPolicy:
     automated:
       prune: true

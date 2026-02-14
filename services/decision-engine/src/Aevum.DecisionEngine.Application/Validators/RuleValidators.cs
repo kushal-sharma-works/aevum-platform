@@ -59,7 +59,7 @@ public sealed class RuleConditionDtoValidator : AbstractValidator<RuleConditionD
             .When(x => x.LogicalOperator.HasValue);
 
         RuleForEach(x => x.NestedConditions)
-            .SetValidator(new RuleConditionDtoValidator())
+            .SetValidator(_ => new RuleConditionDtoValidator())
             .When(x => x.NestedConditions is not null && x.NestedConditions.Count > 0);
     }
 }

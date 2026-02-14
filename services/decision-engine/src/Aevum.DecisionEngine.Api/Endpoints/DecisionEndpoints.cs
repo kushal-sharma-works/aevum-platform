@@ -3,6 +3,7 @@ using Aevum.DecisionEngine.Application.DTOs;
 using Aevum.DecisionEngine.Application.Mapping;
 using Aevum.DecisionEngine.Application.Services;
 using Aevum.DecisionEngine.Domain.Interfaces;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Aevum.DecisionEngine.Api.Endpoints;
 
@@ -40,10 +41,10 @@ public static class DecisionEndpoints
 
     private static async Task<IResult> EvaluateDecisionAsync(
         EvaluateDecisionRequest request,
-        IValidator<EvaluateDecisionRequest> validator,
-        EvaluationService evaluationService,
-        RuleManagementService ruleManagementService,
-        TimeProvider timeProvider,
+        [FromServices] IValidator<EvaluateDecisionRequest> validator,
+        [FromServices] EvaluationService evaluationService,
+        [FromServices] RuleManagementService ruleManagementService,
+        [FromServices] TimeProvider timeProvider,
         CancellationToken cancellationToken)
     {
         var validationResult = await validator.ValidateAsync(request, cancellationToken);
@@ -68,7 +69,7 @@ public static class DecisionEndpoints
 
     private static async Task<IResult> GetDecisionByIdAsync(
         string id,
-        IDecisionRepository repository,
+        [FromServices] IDecisionRepository repository,
         CancellationToken cancellationToken)
     {
         var decision = await repository.GetByIdAsync(id, cancellationToken);
@@ -83,7 +84,7 @@ public static class DecisionEndpoints
 
     private static async Task<IResult> GetDecisionByRequestIdAsync(
         string requestId,
-        IDecisionRepository repository,
+        [FromServices] IDecisionRepository repository,
         CancellationToken cancellationToken)
     {
         var decision = await repository.GetByRequestIdAsync(requestId, cancellationToken);
@@ -99,7 +100,7 @@ public static class DecisionEndpoints
     private static async Task<IResult> GetDecisionsByRuleIdAsync(
         string ruleId,
         int? version,
-        IDecisionRepository repository,
+        [FromServices] IDecisionRepository repository,
         CancellationToken cancellationToken)
     {
         var decisions = await repository.GetByRuleIdAsync(ruleId, version, cancellationToken);

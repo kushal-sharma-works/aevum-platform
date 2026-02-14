@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import BaseButton from '@/components/common/BaseButton.vue'
 import { useReplayStore } from '@/stores/replay'
 import ReplayEventFeed from './ReplayEventFeed.vue'
 import ReplayProgress from './ReplayProgress.vue'
@@ -16,17 +15,19 @@ const start = async () => {
 </script>
 
 <template>
-	<div class="space-y-3 rounded border border-slate-800 p-3">
-		<div class="grid gap-2 md:grid-cols-3">
-			<input v-model="streamId" class="rounded bg-slate-900 px-2 py-1" placeholder="Stream ID" />
-			<input v-model="from" class="rounded bg-slate-900 px-2 py-1" placeholder="From ISO" />
-			<input v-model="to" class="rounded bg-slate-900 px-2 py-1" placeholder="To ISO" />
-		</div>
-		<div class="flex gap-2">
-			<BaseButton @click="start">Start Replay</BaseButton>
-			<BaseButton variant="danger" @click="replayStore.stopReplay">Stop</BaseButton>
-		</div>
+	<q-card flat bordered>
+		<q-card-section class="q-gutter-sm">
+			<div class="row q-col-gutter-sm">
+				<div class="col-12 col-md-4"><q-input v-model="streamId" label="Stream ID" outlined /></div>
+				<div class="col-12 col-md-4"><q-input v-model="from" label="From ISO" outlined /></div>
+				<div class="col-12 col-md-4"><q-input v-model="to" label="To ISO" outlined /></div>
+			</div>
+			<div class="row q-gutter-sm">
+				<q-btn color="primary" label="Start Replay" @click="start" />
+				<q-btn color="negative" label="Stop" @click="replayStore.stopReplay" />
+			</div>
 		<ReplayProgress :progress="replayStore.replayProgress" />
 		<ReplayEventFeed :items="replayStore.replayedEvents" />
-	</div>
+		</q-card-section>
+	</q-card>
 </template>

@@ -6,7 +6,11 @@ defineProps<{ auditTrail: AuditTrail }>()
 </script>
 
 <template>
-	<div class="space-y-2">
-		<AuditStep v-for="(step, index) in auditTrail.timeline" :key="index" :step="step" />
-	</div>
+	<q-list bordered separator>
+		<q-item v-for="(step, index) in auditTrail.timeline" :key="index">
+			<q-item-section>
+				<AuditStep :step="step" />
+			</q-item-section>
+		</q-item>
+	</q-list>
 </template>

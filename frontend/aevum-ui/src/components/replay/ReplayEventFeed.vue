@@ -6,9 +6,18 @@ defineProps<{ items: ReadonlyArray<Event | Decision> }>()
 </script>
 
 <template>
-	<div class="max-h-60 space-y-1 overflow-auto rounded border border-slate-800 p-2 text-xs">
-		<div v-for="(item, index) in items" :key="index" class="rounded bg-slate-900 px-2 py-1">
-			{{ 'decisionId' in item ? `Decision ${item.decisionId}` : `Event ${item.eventId}` }}
-		</div>
-	</div>
+	<q-list bordered separator class="feed-list">
+		<q-item v-for="(item, index) in items" :key="index">
+			<q-item-section>
+				<q-item-label>{{ 'decisionId' in item ? `Decision ${item.decisionId}` : `Event ${item.eventId}` }}</q-item-label>
+			</q-item-section>
+		</q-item>
+	</q-list>
 </template>
+
+<style scoped>
+.feed-list {
+	max-height: 240px;
+	overflow: auto;
+}
+</style>

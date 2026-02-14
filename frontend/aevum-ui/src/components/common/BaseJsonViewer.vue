@@ -31,16 +31,22 @@ function copyValue(value: unknown): void {
 </script>
 
 <template>
-	<div class="rounded border border-slate-800 p-2 text-xs">
-		<div class="flex items-center justify-between">
-			<button v-if="isObject" class="text-left text-slate-200" @click="isOpen = !isOpen">
-				{{ label ?? 'root' }} {{ isOpen ? '▼' : '▶' }} {{ !isOpen ? summary : '' }}
-			</button>
-			<span v-else class="text-slate-200">{{ label ?? 'value' }}: {{ String(value) }}</span>
-			<button class="text-blue-300" @click="copyValue(value)">Copy</button>
-		</div>
+	<q-card flat bordered class="text-caption">
+		<q-card-section class="q-py-sm q-px-md">
+			<div class="row items-center justify-between">
+				<q-btn
+					v-if="isObject"
+					flat
+					dense
+					color="grey-8"
+					:label="`${label ?? 'root'} ${isOpen ? '▼' : '▶'} ${!isOpen ? summary : ''}`"
+					@click="isOpen = !isOpen"
+				/>
+				<span v-else>{{ label ?? 'value' }}: {{ String(value) }}</span>
+				<q-btn flat dense color="primary" label="Copy" @click="copyValue(value)" />
+			</div>
 
-		<div v-if="isObject && isOpen" class="mt-2 space-y-2 pl-3">
+			<div v-if="isObject && isOpen" class="q-mt-sm q-gutter-sm" style="padding-left: 12px">
 			<BaseJsonViewer
 				v-for="[key, child] in entries"
 				:key="key"
@@ -49,5 +55,6 @@ function copyValue(value: unknown): void {
 				:depth="(depth ?? 0) + 1"
 			/>
 		</div>
-	</div>
+		</q-card-section>
+	</q-card>
 </template>

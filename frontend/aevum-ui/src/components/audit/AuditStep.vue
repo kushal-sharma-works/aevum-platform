@@ -3,8 +3,10 @@ defineProps<{ step: { readonly timestamp: string; readonly message: string } }>(
 </script>
 
 <template>
-	<div class="rounded border border-slate-800 p-2 text-sm">
-		<div class="text-xs text-slate-400">{{ step.timestamp }}</div>
-		<div>{{ step.message }}</div>
-	</div>
+	<q-card flat bordered>
+		<q-card-section class="q-py-sm q-px-md">
+			<div class="text-caption text-grey-7">{{ step.timestamp }}</div>
+			<div class="text-body2">{{ step.message }}</div>
+		</q-card-section>
+	</q-card>
 </template>

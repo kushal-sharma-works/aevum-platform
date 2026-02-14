@@ -49,7 +49,7 @@ Optional helper scripts:
 ```bash
 bash devops/scripts/local-setup.sh
 bash devops/scripts/seed-data.sh
-bash devops/scripts/port-forward.sh aevum-dev
+bash devops/scripts/port-forward.sh aevum-sit
 ```
 
 ## CI/CD Strategy
@@ -58,14 +58,21 @@ GitHub Actions workflows are in `.github/workflows/`:
 
 - `ci.yml` – change-aware lint/test/build workflow
 - `pr-check.yml` – Helm + Argo manifest validation and rendering checks
-- `cd-dev.yml` – updates `values-dev.yaml` image tags on successful main CI
-- `cd-staging.yml` – updates `values-staging.yaml` image tags on release
-- `cd-prod.yml` – updates `values-prod.yaml` image tags on `v*.*.*` tags
+- `cd-sit.yml` – updates `values-sit.yaml` image tags on main for SIT deployment
+- `deploy-sit-manual.yml` – manual branch-based deploy to SIT from GitHub Actions UI
 - `infra.yml` – Pulumi preview on PR and Pulumi up on main
 
 GitLab parity pipeline exists in `.gitlab-ci.yml` with equivalent stages for lint, test, build, and deploy.
 
-ArgoCD pulls desired state from repo manifests under `devops/argocd/` and deploys Helm charts from `devops/helm/charts/`.
+ArgoCD pulls desired state from repo manifests under `devops/argocd/` and deploys Helm charts from `devops/helm/charts/` into a single Kubernetes application namespace: `aevum-sit`.
+
+Manual deploy option (branch-select + click deploy):
+
+1. Open GitHub Actions → `Deploy SIT (Manual)`
+2. Select the branch in the Run workflow dialog
+3. Click `Run workflow` (optional: provide `image_tag`)
+
+This workflow builds images from the selected branch commit and deploys them to `aevum-sit` via Helm.
 
 ## Monitoring Setup
 

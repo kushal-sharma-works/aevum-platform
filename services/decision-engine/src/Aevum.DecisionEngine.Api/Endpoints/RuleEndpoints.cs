@@ -3,6 +3,7 @@ using Aevum.DecisionEngine.Application.DTOs;
 using Aevum.DecisionEngine.Application.Mapping;
 using Aevum.DecisionEngine.Application.Services;
 using Aevum.DecisionEngine.Domain.Enums;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Aevum.DecisionEngine.Api.Endpoints;
 
@@ -57,8 +58,8 @@ public static class RuleEndpoints
 
     private static async Task<IResult> CreateRuleAsync(
         CreateRuleRequest request,
-        IValidator<CreateRuleRequest> validator,
-        RuleManagementService service,
+        [FromServices] IValidator<CreateRuleRequest> validator,
+        [FromServices] RuleManagementService service,
         CancellationToken cancellationToken)
     {
         var validationResult = await validator.ValidateAsync(request, cancellationToken);
@@ -77,7 +78,7 @@ public static class RuleEndpoints
     private static async Task<IResult> GetRuleByIdAsync(
         string id,
         int? version,
-        RuleManagementService service,
+        [FromServices] RuleManagementService service,
         CancellationToken cancellationToken)
     {
         var rule = await service.GetRuleAsync(id, version, cancellationToken);
@@ -87,8 +88,8 @@ public static class RuleEndpoints
     private static async Task<IResult> UpdateRuleAsync(
         string id,
         UpdateRuleRequest request,
-        IValidator<UpdateRuleRequest> validator,
-        RuleManagementService service,
+        [FromServices] IValidator<UpdateRuleRequest> validator,
+        [FromServices] RuleManagementService service,
         CancellationToken cancellationToken)
     {
         var validationResult = await validator.ValidateAsync(request, cancellationToken);
@@ -104,7 +105,7 @@ public static class RuleEndpoints
 
     private static async Task<IResult> DeleteRuleAsync(
         string id,
-        RuleManagementService service,
+        [FromServices] RuleManagementService service,
         CancellationToken cancellationToken)
     {
         await service.DeleteRuleAsync(id, cancellationToken);
@@ -113,7 +114,7 @@ public static class RuleEndpoints
 
     private static async Task<IResult> GetRulesAsync(
         RuleStatus? status,
-        RuleManagementService service,
+        [FromServices] RuleManagementService service,
         CancellationToken cancellationToken)
     {
         var rules = status.HasValue
@@ -126,7 +127,7 @@ public static class RuleEndpoints
 
     private static async Task<IResult> ActivateRuleAsync(
         string id,
-        RuleManagementService service,
+        [FromServices] RuleManagementService service,
         CancellationToken cancellationToken)
     {
         var activated = await service.ActivateRuleAsync(id, cancellationToken);
@@ -135,7 +136,7 @@ public static class RuleEndpoints
 
     private static async Task<IResult> DeactivateRuleAsync(
         string id,
-        RuleManagementService service,
+        [FromServices] RuleManagementService service,
         CancellationToken cancellationToken)
     {
         var deactivated = await service.DeactivateRuleAsync(id, cancellationToken);

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import BaseButton from '@/components/common/BaseButton.vue'
 import ConditionBuilder from './ConditionBuilder.vue'
 import type { RuleCondition } from '@/types/rule'
 
@@ -15,10 +14,12 @@ function submit(): void {
 </script>
 
 <template>
-	<div class="space-y-3 rounded border border-slate-800 p-3">
-		<input v-model="name" class="w-full rounded bg-slate-900 px-2 py-1" placeholder="Rule name" />
-		<input v-model="description" class="w-full rounded bg-slate-900 px-2 py-1" placeholder="Description" />
-		<ConditionBuilder v-model="conditions" />
-		<BaseButton @click="submit">Create Rule</BaseButton>
-	</div>
+	<q-card flat bordered>
+		<q-card-section class="q-gutter-sm">
+			<q-input v-model="name" label="Rule name" outlined />
+			<q-input v-model="description" label="Description" outlined />
+			<ConditionBuilder v-model="conditions" />
+			<q-btn color="primary" label="Create Rule" @click="submit" />
+		</q-card-section>
+	</q-card>
 </template>
