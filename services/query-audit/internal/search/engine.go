@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/kushal-sharma-works/aevum-platform/services/query-audit/internal/domain"
 )
 
 // Engine performs full-text search
@@ -26,8 +28,9 @@ func NewEngine(client *elasticsearch.Client, logger *slog.Logger) *Engine {
 // Search performs full-text search
 func (e *Engine) Search(ctx context.Context, query string, searchType string, streamID string, from, size int) (map[string]interface{}, error) {
 	body := buildSearchQuery(query, searchType, streamID, from, size)
+	indexes := searchIndexes(searchType)
 
-	res, err := e.client.Search(e.client.Search.WithContext(ctx), e.client.Search.WithIndex("aevum-events", "aevum-decisions"), e.client.Search.WithBody(bytes.NewBufferString(body)))
+	res, err := e.client.Search(e.client.Search.WithContext(ctx), e.client.Search.WithIndex(indexes...), e.client.Search.WithBody(bytes.NewBufferString(body)))
 	if err != nil {
 		e.logger.Error("search failed", slog.Any("error", err))
 		return nil, err
@@ -36,7 +39,7 @@ func (e *Engine) Search(ctx context.Context, query string, searchType string, st
 
 	if res.IsError() {
 		e.logger.Error("search error", slog.Int("status", res.StatusCode))
-		return nil, err
+		return nil, domain.NewDomainErrorWithCause(domain.ErrSearchFailed, "elasticsearch search request failed", fmt.Errorf("status %d", res.StatusCode))
 	}
 
 	var result map[string]interface{}
@@ -48,6 +51,17 @@ func (e *Engine) Search(ctx context.Context, query string, searchType string, st
 	return result, nil
 }
 
+func searchIndexes(searchType string) []string {
+	switch searchType {
+	case "events":
+		return []string{"aevum-events"}
+	case "decisions":
+		return []string{"aevum-decisions"}
+	default:
+		return []string{"aevum-events", "aevum-decisions"}
+	}
+}
+
 // buildSearchQuery builds the ES query
 func buildSearchQuery(query string, searchType string, streamID string, from, size int) string {
 	filters := []map[string]interface{}{}
@@ -56,14 +70,6 @@ func buildSearchQuery(query string, searchType string, streamID string, from, si
 		filters = append(filters, map[string]interface{}{
 			"term": map[string]interface{}{
 				"stream_id": streamID,
-			},
-		})
-	}
-
-	if searchType != "" {
-		filters = append(filters, map[string]interface{}{
-			"term": map[string]interface{}{
-				"event_type": searchType,
 			},
 		})
 	}

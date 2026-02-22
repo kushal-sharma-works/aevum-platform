@@ -13,14 +13,17 @@ Thank you for contributing to Aevum. This guide defines the engineering standard
 3. Start local stack:
 
 ```bash
-make dev
+docker compose up -d --build
 ```
 
 4. Validate changes before opening a PR:
 
 ```bash
-make test
-make lint
+# per-service examples
+cd services/event-timeline && make test-unit
+cd services/decision-engine && make test-unit
+cd services/query-audit && go test ./...
+cd frontend/aevum-ui && npm run lint && npm run test
 ```
 
 ## Branch Naming Convention

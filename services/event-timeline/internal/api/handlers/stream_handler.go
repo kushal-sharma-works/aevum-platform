@@ -41,6 +41,16 @@ func (h *StreamHandler) GetByStream(c *gin.Context) {
 		return
 	}
 	fromSeq := int64(1)
+	if direction == domain.DirectionBackward {
+		latest, err := h.eventStore.GetLatestSequence(c.Request.Context(), streamID)
+		if err != nil {
+			httputil.Internal(c, "stream_query_failed", "failed to query stream events")
+			return
+		}
+		if latest > 0 {
+			fromSeq = latest
+		}
+	}
 	if cursorStr := c.Query("cursor"); cursorStr != "" {
 		cursor, err := domain.DecodeCursor(cursorStr)
 		if err != nil {

@@ -26,7 +26,7 @@ func TestDiffEngineDiffTracksAddedAndRemoved(t *testing.T) {
 	if len(result.Added) != 1 || result.Added[0] != "d3" {
 		t.Fatalf("unexpected added decisions: %+v", result.Added)
 	}
-	if result.Summary != "Added: 1, Removed: 1" {
+	if result.Summary != "Added: 1, Removed: 1, Changed: 0" {
 		t.Fatalf("unexpected summary: %s", result.Summary)
 	}
 }

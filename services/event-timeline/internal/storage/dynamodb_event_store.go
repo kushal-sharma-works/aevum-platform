@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -23,17 +24,82 @@ func NewDynamoDBEventStore(client *dynamodb.Client, tableName string) *DynamoDBE
 	return &DynamoDBEventStore{client: client, tableName: tableName}
 }
 
+const (
+	batchWriteMaxItems = 25
+	batchWriteMaxRetry = 5
+)
+
+func idempotencyLookupKey(streamID, key string) string {
+	if key == "" {
+		return ""
+	}
+	return streamID + "#" + key
+}
+
+func sequenceGuardPK(streamID string) string {
+	return "SEQ#" + streamID
+}
+
+func sequenceGuardSK(sequence int64) string {
+	return strconv.FormatInt(sequence, 10)
+}
+
 func (s *DynamoDBEventStore) PutEvent(ctx context.Context, event domain.Event) error {
 	item, err := attributevalue.MarshalMap(event)
 	if err != nil {
 		return fmt.Errorf("marshal event: %w", err)
 	}
-	_, err = s.client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName:           aws.String(s.tableName),
-		Item:                item,
-		ConditionExpression: aws.String("attribute_not_exists(PK) AND attribute_not_exists(SK)"),
-	})
+
+	transactItems := []types.TransactWriteItem{
+		{
+			Put: &types.Put{
+				TableName:           aws.String(s.tableName),
+				Item:                item,
+				ConditionExpression: aws.String("attribute_not_exists(PK) AND attribute_not_exists(SK)"),
+			},
+		},
+		{
+			Put: &types.Put{
+				TableName: aws.String(s.tableName),
+				Item: map[string]types.AttributeValue{
+					"PK": &types.AttributeValueMemberS{Value: sequenceGuardPK(event.StreamID)},
+					"SK": &types.AttributeValueMemberS{Value: sequenceGuardSK(event.SequenceNumber)},
+				},
+				ConditionExpression: aws.String("attribute_not_exists(PK) AND attribute_not_exists(SK)"),
+			},
+		},
+	}
+
+	idempotencyIndex := -1
+	if event.IdempotencyKey != "" {
+		idempotencyIndex = len(transactItems)
+		transactItems = append(transactItems, types.TransactWriteItem{
+			Put: &types.Put{
+				TableName: aws.String(s.tableName),
+				Item: map[string]types.AttributeValue{
+					"PK": &types.AttributeValueMemberS{Value: "IDEMP#" + idempotencyLookupKey(event.StreamID, event.IdempotencyKey)},
+					"SK": &types.AttributeValueMemberS{Value: "LOCK"},
+				},
+				ConditionExpression: aws.String("attribute_not_exists(PK) AND attribute_not_exists(SK)"),
+			},
+		})
+	}
+
+	_, err = s.client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: transactItems})
 	if err != nil {
+		var cancelled *types.TransactionCanceledException
+		if errors.As(err, &cancelled) {
+			if idempotencyIndex >= 0 && len(cancelled.CancellationReasons) > idempotencyIndex {
+				if aws.ToString(cancelled.CancellationReasons[idempotencyIndex].Code) == "ConditionalCheckFailed" {
+					return fmt.Errorf("idempotency conflict: %w", domain.ErrIdempotencyConflict)
+				}
+			}
+			for _, reason := range cancelled.CancellationReasons {
+				if aws.ToString(reason.Code) == "ConditionalCheckFailed" {
+					return fmt.Errorf("sequence conflict: %w", domain.ErrSequenceConflict)
+				}
+			}
+		}
 		var ccf *types.ConditionalCheckFailedException
 		if errors.As(err, &ccf) {
 			return fmt.Errorf("sequence conflict: %w", domain.ErrSequenceConflict)
@@ -47,19 +113,42 @@ func (s *DynamoDBEventStore) PutEventsBatch(ctx context.Context, events []domain
 	if len(events) == 0 {
 		return nil
 	}
-	items := make([]types.WriteRequest, 0, len(events))
-	for _, event := range events {
-		item, err := attributevalue.MarshalMap(event)
-		if err != nil {
-			return fmt.Errorf("marshal event: %w", err)
+
+	for start := 0; start < len(events); start += batchWriteMaxItems {
+		end := start + batchWriteMaxItems
+		if end > len(events) {
+			end = len(events)
 		}
-		items = append(items, types.WriteRequest{PutRequest: &types.PutRequest{Item: item}})
-	}
-	_, err := s.client.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
-		RequestItems: map[string][]types.WriteRequest{s.tableName: items},
-	})
-	if err != nil {
-		return fmt.Errorf("batch write item: %w", err)
+
+		chunk := events[start:end]
+		items := make([]types.WriteRequest, 0, len(chunk))
+		for _, event := range chunk {
+			item, err := attributevalue.MarshalMap(event)
+			if err != nil {
+				return fmt.Errorf("marshal event: %w", err)
+			}
+			items = append(items, types.WriteRequest{PutRequest: &types.PutRequest{Item: item}})
+		}
+
+		pending := map[string][]types.WriteRequest{s.tableName: items}
+		for attempt := 0; attempt < batchWriteMaxRetry && len(pending[s.tableName]) > 0; attempt++ {
+			resp, err := s.client.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{RequestItems: pending})
+			if err != nil {
+				return fmt.Errorf("batch write item: %w", err)
+			}
+			pending = resp.UnprocessedItems
+			if len(pending[s.tableName]) == 0 {
+				break
+			}
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("batch write cancelled: %w", ctx.Err())
+			case <-time.After(time.Duration(attempt+1) * 25 * time.Millisecond):
+			}
+		}
+		if len(pending[s.tableName]) > 0 {
+			return fmt.Errorf("batch write item: unprocessed items remain")
+		}
 	}
 	return nil
 }
@@ -86,13 +175,13 @@ func (s *DynamoDBEventStore) GetByEventID(ctx context.Context, eventID string) (
 	return event, nil
 }
 
-func (s *DynamoDBEventStore) FindByIdempotencyKey(ctx context.Context, key string) (domain.Event, error) {
+func (s *DynamoDBEventStore) FindByIdempotencyKey(ctx context.Context, streamID, key string) (domain.Event, error) {
 	resp, err := s.client.Query(ctx, &dynamodb.QueryInput{
 		TableName:              aws.String(s.tableName),
 		IndexName:              aws.String(GSI2Name),
 		KeyConditionExpression: aws.String("GSI2PK = :idempotency_key"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":idempotency_key": &types.AttributeValueMemberS{Value: key},
+			":idempotency_key": &types.AttributeValueMemberS{Value: idempotencyLookupKey(streamID, key)},
 		},
 		Limit: aws.Int32(1),
 	})

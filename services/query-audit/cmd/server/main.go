@@ -82,10 +82,9 @@ func main() {
 	}, cfg.Sync.Interval, cfg.Sync.MaxBackoff, logger)
 
 	// Start sync workers
-	ctx, cancel = context.WithTimeout(context.Background(), 5*time.Minute)
-	eventWorker.Start(ctx, "")
-	decisionWorker.Start(ctx, "")
-	cancel()
+	workersCtx, workersCancel := context.WithCancel(context.Background())
+	eventWorker.Start(workersCtx, "")
+	decisionWorker.Start(workersCtx, "")
 
 	// Setup router
 	router := api.SetupRouter(searchEngine, temporalQuery, correlationQuery, diffEngine, auditBuilder)
@@ -113,6 +112,10 @@ func main() {
 	<-sigChan
 
 	logger.Info("shutting down service")
+	workersCancel()
+
+	eventWorker.Stop()
+	decisionWorker.Stop()
 
 	// Graceful shutdown
 	ctx, cancel = context.WithTimeout(context.Background(), 30*time.Second)

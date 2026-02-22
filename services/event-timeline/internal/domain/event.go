@@ -14,7 +14,8 @@ type Event struct {
 	EventType      string            `json:"event_type"`
 	Payload        json.RawMessage   `json:"payload"`
 	Metadata       map[string]string `json:"metadata"`
-	IdempotencyKey string            `json:"idempotency_key" dynamodbav:"GSI2PK"`
+	IdempotencyKey string            `json:"idempotency_key" dynamodbav:"IdempotencyKey"`
+	GSI2PK         string            `json:"-" dynamodbav:"GSI2PK"`
 	OccurredAt     time.Time         `json:"occurred_at"`
 	IngestedAt     time.Time         `json:"ingested_at"`
 	SchemaVersion  int               `json:"schema_version"`
@@ -49,8 +50,16 @@ func NewEvent(in NewEventInput) (Event, error) {
 		Payload:        in.Payload,
 		Metadata:       in.Metadata,
 		IdempotencyKey: in.IdempotencyKey,
+		GSI2PK:         idempotencyPartitionKey(in.StreamID, in.IdempotencyKey),
 		OccurredAt:     in.OccurredAt.UTC(),
 		IngestedAt:     in.IngestedAt.UTC(),
 		SchemaVersion:  in.SchemaVersion,
 	}, nil
+}
+
+func idempotencyPartitionKey(streamID, key string) string {
+	if key == "" {
+		return ""
+	}
+	return fmt.Sprintf("%s#%s", streamID, key)
 }

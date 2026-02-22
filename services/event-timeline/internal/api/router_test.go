@@ -24,7 +24,7 @@ func (routerEventStore) PutEventsBatch(context.Context, []domain.Event) error { 
 func (routerEventStore) GetByEventID(context.Context, string) (domain.Event, error) {
 	return domain.Event{}, domain.ErrNotFound
 }
-func (routerEventStore) FindByIdempotencyKey(context.Context, string) (domain.Event, error) {
+func (routerEventStore) FindByIdempotencyKey(context.Context, string, string) (domain.Event, error) {
 	return domain.Event{}, domain.ErrNotFound
 }
 func (routerEventStore) GetLatestSequence(context.Context, string) (int64, error) { return 0, nil }

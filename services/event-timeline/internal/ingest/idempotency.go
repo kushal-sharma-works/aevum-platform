@@ -16,11 +16,11 @@ func NewIdempotencyChecker(store storage.EventStore) *IdempotencyChecker {
 	return &IdempotencyChecker{store: store}
 }
 
-func (c *IdempotencyChecker) FindExisting(ctx context.Context, key string) (domain.Event, bool, error) {
+func (c *IdempotencyChecker) FindExisting(ctx context.Context, streamID, key string) (domain.Event, bool, error) {
 	if key == "" {
 		return domain.Event{}, false, nil
 	}
-	event, err := c.store.FindByIdempotencyKey(ctx, key)
+	event, err := c.store.FindByIdempotencyKey(ctx, streamID, key)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
 			return domain.Event{}, false, nil

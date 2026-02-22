@@ -6,21 +6,36 @@
 - Go 1.22+
 - .NET 9 SDK
 - Node.js 22+
-- Make
 
 ## Initial Setup
 
 ```bash
 git clone <repo-url>
 cd aevum-platform
-make dev
+docker compose up -d --build
 ```
 
-This starts local services, dependencies, and observability stack.
+This starts the full local stack and automatically runs deterministic seeding.
 
-## Local Workflow (`make dev`)
+`seed-data` is configured as a startup prerequisite for `query-audit` and `aevum-ui`, so users get non-empty local data before opening the UI.
 
-`make dev` orchestrates core service startup with backing dependencies so end-to-end flows can be exercised immediately.
+## Local Workflow (Compose)
+
+Use `docker compose` as the primary local orchestrator:
+
+```bash
+docker compose up -d --build
+docker compose ps
+docker compose logs -f seed-data event-timeline decision-engine query-audit
+```
+
+Open the app at `http://localhost:3000` once `seed-data` has completed.
+
+Expected immediately after first startup:
+- Rules page: non-zero active rules.
+- Decisions page: non-zero seeded decisions.
+- Events page: non-zero events for stream `default`.
+- Timeline page: non-zero recent event entries.
 
 ## Running Services Individually (without Compose)
 
@@ -83,30 +98,31 @@ npm run test
 
 - DynamoDB Local: `http://localhost:8000`
 - MongoDB: `mongodb://localhost:27017`
-- Elasticsearch/OpenSearch: environment-specific local endpoint
+
+Notes:
+- `query-audit` and `aevum-ui` are started by root `docker-compose.yml`.
+- Seeding is automatic on startup via the `seed-data` service.
 
 ## Viewing Traces and Metrics
 
-- Prometheus: `http://localhost:9090`
-- Grafana: `http://localhost:3001`
-
-Use dashboards to inspect ingestion latency, decision throughput/error rate, and sync lag.
+- Prometheus/Grafana are available via optional devops assets and are not part of the default root compose startup.
 
 ## Seeding and Manual Flow Testing
 
 ```bash
-make seed
+docker compose run --rm seed-data
 ```
 
 Then validate:
 
-1. Ingest events.
-2. Confirm decisions are generated.
-3. Query timeline/audit endpoints from frontend.
+1. Open UI at `http://localhost:3000`.
+2. Verify Decisions page shows seeded records.
+3. Verify Events page shows seeded entries for stream `default`.
+4. Verify Timeline page shows recent seeded events.
 
 ## Common Issues
 
-- **Port conflict**: stop local processes using ports 3000/8080/8081/8082/9090/3001.
+- **Port conflict**: stop local processes using ports 8080/8081/9091/8000/27017.
 - **Container startup failure**: inspect `docker compose logs --tail=200`.
 - **Missing env vars**: verify `.env` or exported shell variables.
 - **Test flakiness**: re-run isolated package tests and inspect dependency readiness.

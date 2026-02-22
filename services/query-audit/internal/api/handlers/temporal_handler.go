@@ -29,8 +29,29 @@ func (th *TemporalHandler) Handle(c *gin.Context) {
 	page := c.DefaultQuery("page", "1")
 	pageSize := c.DefaultQuery("size", "50")
 
-	fromTime, _ := time.Parse(time.RFC3339, from)
-	toTime, _ := time.Parse(time.RFC3339, to)
+	if from == "" || to == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "from and to are required"})
+		return
+	}
+	if queryType != "all" && queryType != "events" && queryType != "decisions" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "type must be one of: all, events, decisions"})
+		return
+	}
+
+	fromTime, err := time.Parse(time.RFC3339, from)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "from must be RFC3339"})
+		return
+	}
+	toTime, err := time.Parse(time.RFC3339, to)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "to must be RFC3339"})
+		return
+	}
+	if toTime.Before(fromTime) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "to must be greater than or equal to from"})
+		return
+	}
 
 	pageInt, _ := strconv.Atoi(page)
 	if pageInt < 1 {
@@ -39,6 +60,9 @@ func (th *TemporalHandler) Handle(c *gin.Context) {
 	pageSizeInt, _ := strconv.Atoi(pageSize)
 	if pageSizeInt < 1 {
 		pageSizeInt = 50
+	}
+	if pageSizeInt > 200 {
+		pageSizeInt = 200
 	}
 
 	tq := &domain.TemporalQuery{
@@ -88,6 +112,13 @@ func (ch *CorrelationHandler) Handle(c *gin.Context) {
 	if pageSizeInt < 1 {
 		pageSizeInt = 50
 	}
+	if pageSizeInt > 200 {
+		pageSizeInt = 200
+	}
+	if eventID == "" && decisionID == "" && ruleID == "" && streamID == "" && eventType == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "at least one correlation filter is required"})
+		return
+	}
 
 	cq := &domain.CorrelationQuery{
 		EventID:     eventID,
@@ -130,9 +161,28 @@ func (dh *DiffHandler) Handle(c *gin.Context) {
 	streamID := c.Query("stream_id")
 	ruleID := c.Query("rule_id")
 	ruleVersion := c.Query("rule_version")
+	if ruleVersion == "" {
+		ruleVersion = c.Query("v2")
+	}
 
-	t1, _ := time.Parse(time.RFC3339, t1Str)
-	t2, _ := time.Parse(time.RFC3339, t2Str)
+	if t1Str == "" || t2Str == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "t1 and t2 are required"})
+		return
+	}
+	t1, err := time.Parse(time.RFC3339, t1Str)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "t1 must be RFC3339"})
+		return
+	}
+	t2, err := time.Parse(time.RFC3339, t2Str)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "t2 must be RFC3339"})
+		return
+	}
+	if t2.Before(t1) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "t2 must be greater than or equal to t1"})
+		return
+	}
 
 	dq := &domain.DiffQuery{
 		T1:          t1,
@@ -164,6 +214,10 @@ func NewAuditHandler(b *search.AuditBuilder) *AuditHandler {
 // Handle builds and returns an audit trail
 func (ah *AuditHandler) Handle(c *gin.Context) {
 	decisionID := c.Param("decisionId")
+	if decisionID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "decisionId is required"})
+		return
+	}
 
 	trail, err := ah.builder.Build(c, decisionID)
 	if err != nil {

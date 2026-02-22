@@ -44,7 +44,7 @@ public sealed class RuleManagementService(
             UpdatedAt = now
         };
 
-        return await _ruleRepository.UpdateAsync(updatedRule, cancellationToken);
+        return await _ruleRepository.CreateAsync(updatedRule, cancellationToken);
     }
 
     public async Task<Rule> GetRuleAsync(string id, int? version = null, CancellationToken cancellationToken = default)

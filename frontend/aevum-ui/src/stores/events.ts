@@ -28,6 +28,7 @@ export const useEventsStore = defineStore('events', () => {
 	async function fetchEvent(eventId: string): Promise<void> {
 		isLoading.value = true
 		error.value = null
+		selectedEvent.value = null
 		try {
 			selectedEvent.value = await eventTimelineApi.getEvent(eventId)
 		} catch (err) {

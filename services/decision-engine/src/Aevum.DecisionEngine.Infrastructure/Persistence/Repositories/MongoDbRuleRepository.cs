@@ -26,15 +26,17 @@ public sealed class MongoDbRuleRepository : IRuleRepository
         _collection.Indexes.CreateOne(indexModel);
 
         var versionIndexKeys = Builders<RuleDocument>.IndexKeys
-            .Ascending(r => r.Id)
+            .Ascending(r => r.RuleId)
             .Descending(r => r.Version);
-        var versionIndexModel = new CreateIndexModel<RuleDocument>(versionIndexKeys);
+        var versionIndexModel = new CreateIndexModel<RuleDocument>(
+            versionIndexKeys,
+            new CreateIndexOptions { Unique = true });
         _collection.Indexes.CreateOne(versionIndexModel);
     }
 
     public async Task<Rule?> GetByIdAsync(string id, int? version = null, CancellationToken cancellationToken = default)
     {
-        var filter = Builders<RuleDocument>.Filter.Eq(r => r.Id, id);
+        var filter = Builders<RuleDocument>.Filter.Eq(r => r.RuleId, id);
         
         if (version.HasValue)
         {
@@ -72,20 +74,30 @@ public sealed class MongoDbRuleRepository : IRuleRepository
     public async Task<Rule> UpdateAsync(Rule rule, CancellationToken cancellationToken = default)
     {
         var doc = rule.ToDocument();
-        var filter = Builders<RuleDocument>.Filter.Eq(r => r.Id, rule.Id);
+        var filter = Builders<RuleDocument>.Filter.And(
+            Builders<RuleDocument>.Filter.Eq(r => r.RuleId, rule.Id),
+            Builders<RuleDocument>.Filter.Eq(r => r.Version, rule.Version));
+
+        var existing = await _collection.Find(filter).FirstOrDefaultAsync(cancellationToken);
+        if (existing is null)
+        {
+            throw new InvalidOperationException($"Rule '{rule.Id}' with version '{rule.Version}' was not found for update");
+        }
+
+        doc.InternalId = existing.InternalId;
         await _collection.ReplaceOneAsync(filter, doc, new ReplaceOptions { IsUpsert = false }, cancellationToken);
         return doc.ToDomain();
     }
 
     public async Task DeleteAsync(string id, CancellationToken cancellationToken = default)
     {
-        var filter = Builders<RuleDocument>.Filter.Eq(r => r.Id, id);
+        var filter = Builders<RuleDocument>.Filter.Eq(r => r.RuleId, id);
         await _collection.DeleteManyAsync(filter, cancellationToken);
     }
 
     public async Task<int> GetLatestVersionAsync(string id, CancellationToken cancellationToken = default)
     {
-        var filter = Builders<RuleDocument>.Filter.Eq(r => r.Id, id);
+        var filter = Builders<RuleDocument>.Filter.Eq(r => r.RuleId, id);
         var sort = Builders<RuleDocument>.Sort.Descending(r => r.Version);
         var doc = await _collection.Find(filter).Sort(sort).FirstOrDefaultAsync(cancellationToken);
         return doc?.Version ?? 0;

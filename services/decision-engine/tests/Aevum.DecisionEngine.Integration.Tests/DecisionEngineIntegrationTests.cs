@@ -153,4 +153,134 @@ public sealed class DecisionEngineIntegrationTests : IAsyncLifetime
         decision!.Status.Should().Be(DecisionStatus.Approved);
         decision.MatchedConditions.Should().NotBeEmpty();
     }
+
+    [Fact]
+    public async Task UpdateRule_ShouldCreateNewVersion_AndKeepPreviousVersionQueryable()
+    {
+        // Arrange
+        var createRequest = new CreateRuleRequest
+        {
+            Name = "Versioned Rule",
+            Description = "v1",
+            Conditions =
+            [
+                new RuleConditionDto
+                {
+                    Field = "score",
+                    Operator = ComparisonOperator.GreaterThan,
+                    Value = 50
+                }
+            ],
+            Actions =
+            [
+                new RuleActionDto
+                {
+                    Type = ActionType.StoreDecision,
+                    Parameters = new Dictionary<string, object> { ["result"] = "ok" },
+                    Order = 1
+                }
+            ],
+            Priority = 5
+        };
+
+        var createResponse = await _client.PostAsJsonAsync("/api/v1/rules", createRequest);
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+        var created = await createResponse.Content.ReadFromJsonAsync<RuleResponse>();
+
+        var updateRequest = new UpdateRuleRequest
+        {
+            Name = "Versioned Rule Updated",
+            Description = "v2",
+            Conditions =
+            [
+                new RuleConditionDto
+                {
+                    Field = "score",
+                    Operator = ComparisonOperator.GreaterThan,
+                    Value = 70
+                }
+            ],
+            Actions =
+            [
+                new RuleActionDto
+                {
+                    Type = ActionType.StoreDecision,
+                    Parameters = new Dictionary<string, object> { ["result"] = "ok" },
+                    Order = 1
+                }
+            ],
+            Priority = 6,
+            Status = RuleStatus.Draft
+        };
+
+        // Act
+        var updateResponse = await _client.PutAsJsonAsync($"/api/v1/rules/{created!.Id}", updateRequest);
+        updateResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var updated = await updateResponse.Content.ReadFromJsonAsync<RuleResponse>();
+
+        var v1Response = await _client.GetAsync($"/api/v1/rules/{created.Id}?version=1");
+        var v2Response = await _client.GetAsync($"/api/v1/rules/{created.Id}?version=2");
+        var v1 = await v1Response.Content.ReadFromJsonAsync<RuleResponse>();
+        var v2 = await v2Response.Content.ReadFromJsonAsync<RuleResponse>();
+
+        // Assert
+        updated!.Version.Should().Be(2);
+        v1Response.StatusCode.Should().Be(HttpStatusCode.OK);
+        v2Response.StatusCode.Should().Be(HttpStatusCode.OK);
+        v1!.Name.Should().Be("Versioned Rule");
+        v2!.Name.Should().Be("Versioned Rule Updated");
+    }
+
+    [Fact]
+    public async Task EvaluateDecision_WithSameRequestId_ShouldReturnSameDecision()
+    {
+        // Arrange
+        var createRuleRequest = new CreateRuleRequest
+        {
+            Name = "Idempotency Rule",
+            Conditions =
+            [
+                new RuleConditionDto
+                {
+                    Field = "score",
+                    Operator = ComparisonOperator.GreaterThanOrEqual,
+                    Value = 80
+                }
+            ],
+            Actions =
+            [
+                new RuleActionDto
+                {
+                    Type = ActionType.StoreDecision,
+                    Parameters = new Dictionary<string, object> { ["result"] = "pass" },
+                    Order = 1
+                }
+            ],
+            Priority = 10
+        };
+
+        var createResponse = await _client.PostAsJsonAsync("/api/v1/rules", createRuleRequest);
+        var rule = await createResponse.Content.ReadFromJsonAsync<RuleResponse>();
+        await _client.PostAsync($"/api/v1/rules/{rule!.Id}/activate", null);
+
+        var requestId = Guid.NewGuid().ToString();
+        var evaluateRequest = new EvaluateDecisionRequest
+        {
+            RuleId = rule.Id,
+            Context = new Dictionary<string, object> { ["score"] = 85 },
+            RequestId = requestId
+        };
+
+        // Act
+        var firstResponse = await _client.PostAsJsonAsync("/api/v1/decisions/evaluate", evaluateRequest);
+        var secondResponse = await _client.PostAsJsonAsync("/api/v1/decisions/evaluate", evaluateRequest);
+        var first = await firstResponse.Content.ReadFromJsonAsync<DecisionResponse>();
+        var second = await secondResponse.Content.ReadFromJsonAsync<DecisionResponse>();
+
+        // Assert
+        firstResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        secondResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        first!.Id.Should().Be(second!.Id);
+        first.DeterministicHash.Should().Be(second.DeterministicHash);
+    }
 }

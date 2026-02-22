@@ -2,7 +2,9 @@ package search
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"time"
 
@@ -71,8 +73,35 @@ func (ab *AuditBuilder) Build(ctx context.Context, decisionID string) (*domain.A
 
 // fetchDecision fetches a decision from ES
 func (ab *AuditBuilder) fetchDecision(ctx context.Context, decisionID string) (*domain.IndexedDecision, error) {
-	// This is a simplified version - in production would use ES Get API
-	return &domain.IndexedDecision{DecisionID: decisionID}, nil
+	res, err := ab.esClient.Get("aevum-decisions", decisionID, ab.esClient.Get.WithContext(ctx))
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.IsError() {
+		return nil, fmt.Errorf("fetch decision failed: status %d", res.StatusCode)
+	}
+
+	var payload map[string]interface{}
+	if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+		return nil, err
+	}
+
+	source, ok := payload["_source"].(map[string]interface{})
+	if !ok {
+		body, _ := io.ReadAll(res.Body)
+		return nil, fmt.Errorf("decision source missing: %s", string(body))
+	}
+
+	return &domain.IndexedDecision{
+		DecisionID:  asString(source["decision_id"]),
+		EventID:     asString(source["event_id"]),
+		StreamID:    asString(source["stream_id"]),
+		RuleID:      asString(source["rule_id"]),
+		RuleVersion: asString(source["rule_version"]),
+		Status:      asString(source["status"]),
+		EvaluatedAt: asTime(source["evaluated_at"]),
+	}, nil
 }
 
 // buildChain builds the causal chain
@@ -120,4 +149,23 @@ func (ab *AuditBuilder) buildChain(decision *domain.IndexedDecision, eventRaw *m
 	}
 
 	return chain
+}
+
+func asString(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	if s, ok := v.(string); ok {
+		return s
+	}
+	return fmt.Sprint(v)
+}
+
+func asTime(v interface{}) time.Time {
+	if s, ok := v.(string); ok {
+		if parsed, err := time.Parse(time.RFC3339, s); err == nil {
+			return parsed
+		}
+	}
+	return time.Time{}
 }

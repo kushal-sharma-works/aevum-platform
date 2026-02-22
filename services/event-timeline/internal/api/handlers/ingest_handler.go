@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -31,6 +32,7 @@ func (h *IngestHandler) Ingest(c *gin.Context) {
 			httputil.BadRequest(c, "validation_failed", err.Error())
 			return
 		}
+		slog.Error("ingest failed", slog.String("error", err.Error()))
 		httputil.Internal(c, "ingest_failed", "failed to ingest event")
 		return
 	}

@@ -28,12 +28,12 @@ func NewDiffEngine(client *elasticsearch.Client, logger *slog.Logger) *DiffEngin
 
 // Compare compares decisions at two points in time
 func (de *DiffEngine) Compare(ctx context.Context, query *domain.DiffQuery) (*domain.DiffResult, error) {
-	t1Decisions, err := de.queryDecisions(ctx, query.T1, query.RuleID, query.StreamID)
+	t1Decisions, err := de.queryDecisions(ctx, query.T1, query.RuleID, query.RuleVersion, query.StreamID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query T1 decisions: %w", err)
 	}
 
-	t2Decisions, err := de.queryDecisions(ctx, query.T2, query.RuleID, query.StreamID)
+	t2Decisions, err := de.queryDecisions(ctx, query.T2, query.RuleID, query.RuleVersion, query.StreamID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query T2 decisions: %w", err)
 	}
@@ -42,7 +42,7 @@ func (de *DiffEngine) Compare(ctx context.Context, query *domain.DiffQuery) (*do
 }
 
 // queryDecisions fetches decisions at a specific time
-func (de *DiffEngine) queryDecisions(ctx context.Context, before time.Time, ruleID, streamID string) (map[string]*domain.IndexedDecision, error) {
+func (de *DiffEngine) queryDecisions(ctx context.Context, before time.Time, ruleID, ruleVersion, streamID string) (map[string]*domain.IndexedDecision, error) {
 	filters := []map[string]interface{}{
 		{
 			"range": map[string]interface{}{
@@ -54,6 +54,11 @@ func (de *DiffEngine) queryDecisions(ctx context.Context, before time.Time, rule
 	if ruleID != "" {
 		filters = append(filters, map[string]interface{}{
 			"term": map[string]interface{}{"rule_id": ruleID},
+		})
+	}
+	if ruleVersion != "" {
+		filters = append(filters, map[string]interface{}{
+			"term": map[string]interface{}{"rule_version": ruleVersion},
 		})
 	}
 
@@ -76,6 +81,9 @@ func (de *DiffEngine) queryDecisions(ctx context.Context, before time.Time, rule
 		return nil, err
 	}
 	defer res.Body.Close()
+	if res.IsError() {
+		return nil, fmt.Errorf("query decisions failed: status %d", res.StatusCode)
+	}
 
 	var result map[string]interface{}
 	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
@@ -89,8 +97,12 @@ func (de *DiffEngine) queryDecisions(ctx context.Context, before time.Time, rule
 				if source, ok := hit["_source"].(map[string]interface{}); ok {
 					decisionID := fmt.Sprint(source["decision_id"])
 					decisions[decisionID] = &domain.IndexedDecision{
-						DecisionID: decisionID,
-						RuleID:     fmt.Sprint(source["rule_id"]),
+						DecisionID:  decisionID,
+						RuleID:      fmt.Sprint(source["rule_id"]),
+						RuleVersion: fmt.Sprint(source["rule_version"]),
+						Status:      fmt.Sprint(source["status"]),
+						Output:      mapFrom(source["output"]),
+						Input:       mapFrom(source["input"]),
 					}
 				}
 			}
@@ -122,6 +134,36 @@ func (de *DiffEngine) diff(t1, t2 map[string]*domain.IndexedDecision) *domain.Di
 		}
 	}
 
-	result.Summary = fmt.Sprintf("Added: %d, Removed: %d", len(result.Added), len(result.Removed))
+	for id, after := range t2 {
+		before, exists := t1[id]
+		if !exists {
+			continue
+		}
+		if before.Status != after.Status {
+			result.Changed = append(result.Changed, domain.FieldDiff{
+				DecisionID: id,
+				Field:      "status",
+				OldValue:   before.Status,
+				NewValue:   after.Status,
+			})
+		}
+		if before.RuleVersion != after.RuleVersion {
+			result.Changed = append(result.Changed, domain.FieldDiff{
+				DecisionID: id,
+				Field:      "rule_version",
+				OldValue:   before.RuleVersion,
+				NewValue:   after.RuleVersion,
+			})
+		}
+	}
+
+	result.Summary = fmt.Sprintf("Added: %d, Removed: %d, Changed: %d", len(result.Added), len(result.Removed), len(result.Changed))
 	return result
+}
+
+func mapFrom(value interface{}) map[string]interface{} {
+	if mapped, ok := value.(map[string]interface{}); ok {
+		return mapped
+	}
+	return map[string]interface{}{}
 }

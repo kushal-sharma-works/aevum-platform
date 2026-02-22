@@ -11,7 +11,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"golang.org/x/sync/errgroup"
 
@@ -54,16 +56,25 @@ func run() error {
 		_ = tp.Shutdown(shutdownCtx)
 	}()
 
-	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(cfg.AWSRegion))
+	loadOptions := []func(*awsconfig.LoadOptions) error{
+		awsconfig.WithRegion(cfg.AWSRegion),
+	}
+	if cfg.DynamoEndpoint != "" {
+		loadOptions = append(loadOptions, awsconfig.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("local", "local", "")))
+		loadOptions = append(loadOptions, awsconfig.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(func(service, region string, _ ...interface{}) (aws.Endpoint, error) {
+			if service == dynamodb.ServiceID {
+				return aws.Endpoint{URL: cfg.DynamoEndpoint, SigningRegion: cfg.AWSRegion, HostnameImmutable: true}, nil
+			}
+			return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+		})))
+	}
+
+	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, loadOptions...)
 	if err != nil {
 		return fmt.Errorf("load aws config: %w", err)
 	}
 
-	dynamoClient := dynamodb.NewFromConfig(awsCfg, func(options *dynamodb.Options) {
-		if cfg.DynamoEndpoint != "" {
-			options.BaseEndpoint = &cfg.DynamoEndpoint
-		}
-	})
+	dynamoClient := dynamodb.NewFromConfig(awsCfg)
 
 	metrics := observability.NewMetrics()
 	eventStore := storage.NewDynamoDBEventStore(dynamoClient, cfg.DynamoTable)

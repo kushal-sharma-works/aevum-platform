@@ -21,16 +21,14 @@ public sealed class EvaluationService(
         EvaluationContext context,
         CancellationToken cancellationToken = default)
     {
+        var existingDecision = await _decisionRepository.GetByRequestIdAsync(context.RequestId, cancellationToken);
+        if (existingDecision is not null)
+        {
+            return existingDecision;
+        }
+
         var stopwatch = Stopwatch.StartNew();
         var deterministicHash = _evaluator.ComputeHash(rule, context);
-
-        // Check for idempotency
-        var existingDecision = await _decisionRepository.ExistsByHashAsync(deterministicHash, cancellationToken);
-        if (existingDecision)
-        {
-            var existing = (await _decisionRepository.GetByRequestIdAsync(context.RequestId, cancellationToken))!;
-            return existing;
-        }
 
         var result = _evaluator.Evaluate(rule, context);
         stopwatch.Stop();
@@ -52,33 +50,48 @@ public sealed class EvaluationService(
             EvaluationDurationMs = stopwatch.ElapsedMilliseconds
         };
 
-        var savedDecision = await _decisionRepository.CreateAsync(decision, cancellationToken);
-
-        // Ingest event to timeline (fire and forget with error handling)
-        _ = Task.Run(async () =>
+        Decision savedDecision;
+        try
         {
-            try
+            savedDecision = await _decisionRepository.CreateAsync(decision, cancellationToken);
+        }
+        catch
+        {
+            var existingOnRetry = await _decisionRepository.GetByRequestIdAsync(context.RequestId, cancellationToken);
+            if (existingOnRetry is not null)
             {
-                await _eventTimelineClient.IngestEventAsync(
-                    streamId: $"decision-{decision.Id}",
-                    eventType: "decision.evaluated",
-                    data: new
-                    {
-                        decision.Id,
-                        decision.RuleId,
-                        decision.RuleVersion,
-                        decision.Status,
-                        decision.EvaluatedAt,
-                        decision.DeterministicHash
-                    },
-                    CancellationToken.None);
+                return existingOnRetry;
             }
-            catch
-            {
-                // Silently fail - event ingestion is not critical
-            }
-        }, CancellationToken.None);
+
+            throw;
+        }
+
+        _ = PublishTimelineEventAsync(savedDecision);
 
         return savedDecision;
+    }
+
+    private async Task PublishTimelineEventAsync(Decision decision)
+    {
+        try
+        {
+            await _eventTimelineClient.IngestEventAsync(
+                streamId: $"decision-{decision.Id}",
+                eventType: "decision.evaluated",
+                data: new
+                {
+                    decision.Id,
+                    decision.RuleId,
+                    decision.RuleVersion,
+                    decision.Status,
+                    decision.EvaluatedAt,
+                    decision.DeterministicHash
+                },
+                CancellationToken.None);
+        }
+        catch
+        {
+            // Silently fail - event ingestion is not critical
+        }
     }
 }

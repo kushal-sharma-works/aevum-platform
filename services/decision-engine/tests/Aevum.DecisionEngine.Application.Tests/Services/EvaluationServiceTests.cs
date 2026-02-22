@@ -38,7 +38,8 @@ public sealed class EvaluationServiceTests
         var hash = "testhash123";
 
         _evaluator.ComputeHash(rule, context).Returns(hash);
-        _decisionRepository.ExistsByHashAsync(hash, Arg.Any<CancellationToken>()).Returns(false);
+        _decisionRepository.GetByRequestIdAsync(context.RequestId, Arg.Any<CancellationToken>())
+            .Returns((Decision?)null);
         _evaluator.Evaluate(rule, context).Returns(new EvaluationResult
         {
             IsMatch = true,
@@ -62,7 +63,7 @@ public sealed class EvaluationServiceTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_WithExistingHash_ShouldReturnCachedDecision()
+    public async Task EvaluateAsync_WithExistingRequestId_ShouldReturnCachedDecision()
     {
         // Arrange
         var rule = CreateTestRule();
@@ -71,7 +72,6 @@ public sealed class EvaluationServiceTests
         var existingDecision = CreateTestDecision();
 
         _evaluator.ComputeHash(rule, context).Returns(hash);
-        _decisionRepository.ExistsByHashAsync(hash, Arg.Any<CancellationToken>()).Returns(true);
         _decisionRepository.GetByRequestIdAsync(context.RequestId, Arg.Any<CancellationToken>())
             .Returns(existingDecision);
 
@@ -82,6 +82,37 @@ public sealed class EvaluationServiceTests
         result.Should().Be(existingDecision);
         _evaluator.DidNotReceive().Evaluate(Arg.Any<Rule>(), Arg.Any<EvaluationContext>());
         await _decisionRepository.DidNotReceive().CreateAsync(Arg.Any<Decision>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_WhenCreateFailsButDecisionExists_ShouldReturnExistingDecision()
+    {
+        // Arrange
+        var rule = CreateTestRule();
+        var context = CreateTestContext();
+        var hash = "testhash123";
+        var existingDecision = CreateTestDecision();
+
+        _decisionRepository.GetByRequestIdAsync(context.RequestId, Arg.Any<CancellationToken>())
+            .Returns((Decision?)null, existingDecision);
+        _evaluator.ComputeHash(rule, context).Returns(hash);
+        _evaluator.Evaluate(rule, context).Returns(new EvaluationResult
+        {
+            IsMatch = true,
+            MatchedConditions = ["amount > 100"],
+            ActionsToExecute = rule.Actions.ToList(),
+            Status = DecisionStatus.Approved,
+            DeterministicHash = hash
+        });
+
+        _decisionRepository.CreateAsync(Arg.Any<Decision>(), Arg.Any<CancellationToken>())
+            .Returns<Task<Decision>>(_ => throw new InvalidOperationException("duplicate key"));
+
+        // Act
+        var result = await _service.EvaluateAsync(rule, context, CancellationToken.None);
+
+        // Assert
+        result.Should().Be(existingDecision);
     }
 
     private static Rule CreateTestRule()

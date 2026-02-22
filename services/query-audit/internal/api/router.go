@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/kushal-sharma-works/aevum-platform/services/query-audit/internal/api/handlers"
 	"github.com/kushal-sharma-works/aevum-platform/services/query-audit/internal/middleware"
 	"github.com/kushal-sharma-works/aevum-platform/services/query-audit/internal/search"
 )
@@ -24,120 +25,41 @@ func SetupRouter(searchEngine *search.Engine, temporalQuery *search.TemporalQuer
 	v1 := router.Group("/api/v1")
 
 	// Search endpoints
-	v1.POST("/search", NewSearchHandler(searchEngine).Handle)
-	v1.POST("/timeline", NewTemporalHandler(temporalQuery).Handle)
-	v1.POST("/correlate", NewCorrelationHandler(correlationQuery).Handle)
-	v1.POST("/diff", NewDiffHandler(diffEngine).Handle)
-	v1.GET("/audit/:decisionId", NewAuditHandler(auditBuilder).Handle)
+	if searchEngine != nil {
+		searchHandler := handlers.NewSearchHandler(searchEngine)
+		v1.GET("/search", searchHandler.Handle)
+		v1.POST("/search", searchHandler.Handle)
+	}
+	if temporalQuery != nil {
+		temporalHandler := handlers.NewTemporalHandler(temporalQuery)
+		v1.GET("/timeline", temporalHandler.Handle)
+		v1.POST("/timeline", temporalHandler.Handle)
+	}
+	if correlationQuery != nil {
+		correlationHandler := handlers.NewCorrelationHandler(correlationQuery)
+		v1.GET("/correlate", correlationHandler.Handle)
+		v1.POST("/correlate", correlationHandler.Handle)
+	}
+	if diffEngine != nil {
+		diffHandler := handlers.NewDiffHandler(diffEngine)
+		v1.GET("/diff", diffHandler.Handle)
+		v1.POST("/diff", diffHandler.Handle)
+	}
+	if auditBuilder != nil {
+		v1.GET("/audit/:decisionId", handlers.NewAuditHandler(auditBuilder).Handle)
+	}
 
 	// Admin endpoints
 	admin := router.Group("/admin")
-	admin.POST("/sync", NewSyncHandler().Handle)
-	admin.GET("/metrics", NewMetricsHandler().Handle)
+	admin.POST("/sync", func(c *gin.Context) {
+		c.JSON(http.StatusOK, map[string]string{"status": "synced"})
+	})
+	admin.GET("/metrics", func(c *gin.Context) {
+		c.JSON(http.StatusOK, map[string]interface{}{
+			"total_documents": 0,
+			"indexes":         []string{},
+		})
+	})
 
 	return router
-}
-
-// SearchHandler handles search requests
-type SearchHandler struct {
-	engine *search.Engine
-}
-
-// NewSearchHandler creates a new search handler
-func NewSearchHandler(engine *search.Engine) *SearchHandler {
-	return &SearchHandler{engine: engine}
-}
-
-// Handle handles search requests
-func (sh *SearchHandler) Handle(c *gin.Context) {
-	c.JSON(http.StatusOK, map[string]string{"status": "ok"})
-}
-
-// TemporalHandler handles temporal queries
-type TemporalHandler struct {
-	query *search.TemporalQuery
-}
-
-// NewTemporalHandler creates a new temporal handler
-func NewTemporalHandler(q *search.TemporalQuery) *TemporalHandler {
-	return &TemporalHandler{query: q}
-}
-
-// Handle handles temporal requests
-func (th *TemporalHandler) Handle(c *gin.Context) {
-	c.JSON(http.StatusOK, map[string]string{"status": "ok"})
-}
-
-// CorrelationHandler handles correlation queries
-type CorrelationHandler struct {
-	query *search.CorrelationQuery
-}
-
-// NewCorrelationHandler creates a new correlation handler
-func NewCorrelationHandler(q *search.CorrelationQuery) *CorrelationHandler {
-	return &CorrelationHandler{query: q}
-}
-
-// Handle handles correlation requests
-func (ch *CorrelationHandler) Handle(c *gin.Context) {
-	c.JSON(http.StatusOK, map[string]string{"status": "ok"})
-}
-
-// DiffHandler handles diff queries
-type DiffHandler struct {
-	engine *search.DiffEngine
-}
-
-// NewDiffHandler creates a new diff handler
-func NewDiffHandler(engine *search.DiffEngine) *DiffHandler {
-	return &DiffHandler{engine: engine}
-}
-
-// Handle handles diff requests
-func (dh *DiffHandler) Handle(c *gin.Context) {
-	c.JSON(http.StatusOK, map[string]string{"status": "ok"})
-}
-
-// AuditHandler handles audit requests
-type AuditHandler struct {
-	builder *search.AuditBuilder
-}
-
-// NewAuditHandler creates a new audit handler
-func NewAuditHandler(builder *search.AuditBuilder) *AuditHandler {
-	return &AuditHandler{builder: builder}
-}
-
-// Handle handles audit requests
-func (ah *AuditHandler) Handle(c *gin.Context) {
-	c.JSON(http.StatusOK, map[string]string{"status": "ok"})
-}
-
-// SyncHandler handles sync requests
-type SyncHandler struct{}
-
-// NewSyncHandler creates a new sync handler
-func NewSyncHandler() *SyncHandler {
-	return &SyncHandler{}
-}
-
-// Handle handles sync requests
-func (sh *SyncHandler) Handle(c *gin.Context) {
-	c.JSON(http.StatusOK, map[string]string{"status": "synced"})
-}
-
-// MetricsHandler handles metrics requests
-type MetricsHandler struct{}
-
-// NewMetricsHandler creates a new metrics handler
-func NewMetricsHandler() *MetricsHandler {
-	return &MetricsHandler{}
-}
-
-// Handle handles metrics requests
-func (mh *MetricsHandler) Handle(c *gin.Context) {
-	c.JSON(http.StatusOK, map[string]interface{}{
-		"total_documents": 0,
-		"indexes":         []string{},
-	})
 }

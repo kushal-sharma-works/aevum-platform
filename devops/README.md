@@ -1,25 +1,23 @@
 # DevOps Runbook
 
-This repository now includes a complete deployment/testing suite for:
+This repository includes deployment/testing assets for:
 
 - Local development and smoke testing via Docker Compose
-- SIT deployment via Kubernetes manifests (Kustomize)
-- GitOps deployment via ArgoCD (Application + ApplicationSet)
+- optional SIT deployment via Kubernetes manifests (Kustomize)
+- optional GitOps deployment via ArgoCD (Application + ApplicationSet)
 
 ## Local: one-command stack
 
 From repository root:
 
 ```bash
-./scripts/local-setup.sh
+./devops/scripts/local-setup.sh
 ```
 
 What starts:
 
-- MongoDB (`localhost:27017`)
-- DynamoDB Local (`localhost:8000`)
-- Event Timeline (`localhost:8081`, admin `localhost:9091`)
-- Decision Engine (`localhost:8080`)
+- The setup script prepares local DynamoDB table(s).
+- Start services with root compose: `docker compose up -d --build`
 
 Quick smoke checks:
 
@@ -32,15 +30,11 @@ curl -f http://localhost:9091/admin/health
 
 Unit-only (default):
 
-```bash
-./scripts/local-test.sh
-```
+Run service-level tests from each service directory (`make test-unit` / language-native test command).
 
 Unit + integration (opt-in):
 
-```bash
-./scripts/local-test.sh --integration
-```
+Integration tests are optional and service-specific.
 
 ## SIT deploy (kubectl)
 
@@ -49,10 +43,10 @@ Prereqs:
 - Access to target Kubernetes cluster
 - `kubectl` configured to SIT context
 
-Deploy:
+Deploy (manual):
 
 ```bash
-./scripts/sit-deploy.sh
+kubectl apply -k devops/k8s/overlays/sit
 ```
 
 Manifests path:

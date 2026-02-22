@@ -29,7 +29,7 @@ func (s *adminEventStore) PutEventsBatch(context.Context, []domain.Event) error 
 func (s *adminEventStore) GetByEventID(context.Context, string) (domain.Event, error) {
 	return domain.Event{}, domain.ErrNotFound
 }
-func (s *adminEventStore) FindByIdempotencyKey(context.Context, string) (domain.Event, error) {
+func (s *adminEventStore) FindByIdempotencyKey(context.Context, string, string) (domain.Event, error) {
 	return domain.Event{}, domain.ErrNotFound
 }
 func (s *adminEventStore) GetLatestSequence(context.Context, string) (int64, error) {

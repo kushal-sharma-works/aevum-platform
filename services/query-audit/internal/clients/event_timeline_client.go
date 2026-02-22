@@ -2,16 +2,24 @@ package clients
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"os"
+	"strings"
 	"time"
 )
 
 // EventTimelineClient communicates with Event Timeline Service
 type EventTimelineClient struct {
 	baseURL    string
+	jwtSecret  string
+	defaultStream string
 	httpClient *http.Client
 }
 
@@ -19,23 +27,49 @@ type EventTimelineClient struct {
 func NewEventTimelineClient(baseURL string) *EventTimelineClient {
 	return &EventTimelineClient{
 		baseURL: baseURL,
+		jwtSecret: os.Getenv("EVENT_TIMELINE_JWT_SECRET"),
+		defaultStream: func() string {
+			stream := os.Getenv("EVENT_TIMELINE_DEFAULT_STREAM")
+			if strings.TrimSpace(stream) == "" {
+				return "default"
+			}
+			return stream
+		}(),
 		httpClient: &http.Client{
 			Timeout: 10 * time.Second,
 		},
 	}
 }
 
+func (c *EventTimelineClient) addAuth(req *http.Request) {
+	if strings.TrimSpace(c.jwtSecret) == "" {
+		return
+	}
+	now := time.Now().Unix()
+	exp := now + 3600
+	headerJSON := `{"alg":"HS256","typ":"JWT"}`
+	payloadJSON := fmt.Sprintf(`{"iss":"query-audit","sub":"sync-worker","iat":%d,"exp":%d}`, now, exp)
+	header := base64.RawURLEncoding.EncodeToString([]byte(headerJSON))
+	payload := base64.RawURLEncoding.EncodeToString([]byte(payloadJSON))
+	unsigned := header + "." + payload
+	h := hmac.New(sha256.New, []byte(c.jwtSecret))
+	_, _ = h.Write([]byte(unsigned))
+	sig := base64.RawURLEncoding.EncodeToString(h.Sum(nil))
+	req.Header.Set("Authorization", "Bearer "+unsigned+"."+sig)
+}
+
 // GetEvents fetches events with cursor-based pagination
 func (c *EventTimelineClient) GetEvents(ctx context.Context, cursor string, limit int) ([]map[string]interface{}, string, error) {
-	url := fmt.Sprintf("%s/api/v1/streams/all/events?limit=%d", c.baseURL, limit)
+	endpoint := fmt.Sprintf("%s/api/v1/streams/%s/events?limit=%d", c.baseURL, c.defaultStream, limit)
 	if cursor != "" {
-		url += fmt.Sprintf("&cursor=%s", cursor)
+		endpoint += fmt.Sprintf("&cursor=%s", url.QueryEscape(cursor))
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
 		return nil, "", err
 	}
+	c.addAuth(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -58,7 +92,7 @@ func (c *EventTimelineClient) GetEvents(ctx context.Context, cursor string, limi
 	}
 
 	events := []map[string]interface{}{}
-	if data, ok := result["data"].([]interface{}); ok {
+	if data, ok := result["events"].([]interface{}); ok {
 		for _, e := range data {
 			if event, ok := e.(map[string]interface{}); ok {
 				events = append(events, event)
@@ -67,10 +101,8 @@ func (c *EventTimelineClient) GetEvents(ctx context.Context, cursor string, limi
 	}
 
 	newCursor := cursor
-	if meta, ok := result["meta"].(map[string]interface{}); ok {
-		if nc, ok := meta["next_cursor"].(string); ok {
-			newCursor = nc
-		}
+	if nc, ok := result["next_cursor"].(string); ok {
+		newCursor = nc
 	}
 
 	return events, newCursor, nil
@@ -84,6 +116,7 @@ func (c *EventTimelineClient) GetEvent(ctx context.Context, eventID string) (*ma
 	if err != nil {
 		return nil, err
 	}
+	c.addAuth(req)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -105,11 +138,7 @@ func (c *EventTimelineClient) GetEvent(ctx context.Context, eventID string) (*ma
 		return nil, err
 	}
 
-	if data, ok := result["data"].(map[string]interface{}); ok {
-		return &data, nil
-	}
-
-	return nil, fmt.Errorf("no data in response")
+	return &result, nil
 }
 
 // DecisionEngineClient communicates with Decision Engine Service
@@ -130,39 +159,77 @@ func NewDecisionEngineClient(baseURL string) *DecisionEngineClient {
 
 // GetDecisions fetches decisions in a time range
 func (c *DecisionEngineClient) GetDecisions(ctx context.Context, from, to time.Time) ([]map[string]interface{}, error) {
-	url := fmt.Sprintf("%s/api/v1/decisions?from=%s&to=%s", c.baseURL, from.Format(time.RFC3339), to.Format(time.RFC3339))
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch decisions: status %d", resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var result map[string]interface{}
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, err
-	}
-
 	decisions := []map[string]interface{}{}
-	if data, ok := result["data"].([]interface{}); ok {
-		for _, d := range data {
-			if decision, ok := d.(map[string]interface{}); ok {
-				decisions = append(decisions, decision)
+
+	rulesURL := fmt.Sprintf("%s/api/v1/rules", c.baseURL)
+	rulesReq, err := http.NewRequestWithContext(ctx, "GET", rulesURL, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	rulesResp, err := c.httpClient.Do(rulesReq)
+	if err != nil {
+		return nil, err
+	}
+	defer rulesResp.Body.Close()
+
+	if rulesResp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to fetch decisions: status %d", rulesResp.StatusCode)
+	}
+
+	rulesBody, err := io.ReadAll(rulesResp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var rules []map[string]interface{}
+	if err := json.Unmarshal(rulesBody, &rules); err != nil {
+		return nil, err
+	}
+
+	for _, rule := range rules {
+		ruleID, _ := rule["id"].(string)
+		if strings.TrimSpace(ruleID) == "" {
+			continue
+		}
+
+		decisionsURL := fmt.Sprintf("%s/api/v1/decisions/rule/%s", c.baseURL, ruleID)
+		decisionsReq, err := http.NewRequestWithContext(ctx, "GET", decisionsURL, nil)
+		if err != nil {
+			continue
+		}
+
+		decisionsResp, err := c.httpClient.Do(decisionsReq)
+		if err != nil {
+			continue
+		}
+
+		if decisionsResp.StatusCode != http.StatusOK {
+			_ = decisionsResp.Body.Close()
+			continue
+		}
+
+		decisionBody, err := io.ReadAll(decisionsResp.Body)
+		_ = decisionsResp.Body.Close()
+		if err != nil {
+			continue
+		}
+
+		var decisionList []map[string]interface{}
+		if err := json.Unmarshal(decisionBody, &decisionList); err != nil {
+			continue
+		}
+
+		for _, decision := range decisionList {
+			timestamp, _ := decision["evaluated_at"].(string)
+			if strings.TrimSpace(timestamp) != "" {
+				if ts, err := time.Parse(time.RFC3339, timestamp); err == nil {
+					if ts.Before(from) || ts.After(to) {
+						continue
+					}
+				}
 			}
+			decisions = append(decisions, decision)
 		}
 	}
 
@@ -198,11 +265,7 @@ func (c *DecisionEngineClient) GetDecision(ctx context.Context, decisionID strin
 		return nil, err
 	}
 
-	if data, ok := result["data"].(map[string]interface{}); ok {
-		return &data, nil
-	}
-
-	return nil, fmt.Errorf("no data in response")
+	return &result, nil
 }
 
 // GetRules fetches all rules
@@ -229,13 +292,13 @@ func (c *DecisionEngineClient) GetRules(ctx context.Context) (map[string]interfa
 		return nil, err
 	}
 
-	var result map[string]interface{}
+	var result any
 	if err := json.Unmarshal(body, &result); err != nil {
 		return nil, err
 	}
 
-	if data, ok := result["data"].(map[string]interface{}); ok {
-		return data, nil
+	if rules, ok := result.([]interface{}); ok {
+		return map[string]interface{}{"rules": rules}, nil
 	}
 
 	return make(map[string]interface{}), nil
@@ -270,9 +333,5 @@ func (c *DecisionEngineClient) GetRule(ctx context.Context, ruleID string) (map[
 		return nil, err
 	}
 
-	if data, ok := result["data"].(map[string]interface{}); ok {
-		return data, nil
-	}
-
-	return make(map[string]interface{}), nil
+	return result, nil
 }

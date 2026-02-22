@@ -37,7 +37,7 @@ func (s *Service) Ingest(ctx context.Context, in EventInput) (domain.Event, bool
 		s.metrics.RecordIngest(in.StreamID, in.EventType, "invalid")
 		return domain.Event{}, false, err
 	}
-	if existing, ok, err := s.idempotency.FindExisting(ctx, in.IdempotencyKey); err != nil {
+	if existing, ok, err := s.idempotency.FindExisting(ctx, in.StreamID, in.IdempotencyKey); err != nil {
 		return domain.Event{}, false, fmt.Errorf("idempotency check: %w", err)
 	} else if ok {
 		s.metrics.RecordIngest(in.StreamID, in.EventType, "duplicate")
@@ -76,6 +76,18 @@ func (s *Service) Ingest(ctx context.Context, in EventInput) (domain.Event, bool
 			s.metrics.ObserveIngestionDuration(time.Since(start).Seconds())
 			return candidate, true, nil
 		}
+		if errors.Is(err, domain.ErrIdempotencyConflict) {
+			existing, ok, lookupErr := s.idempotency.FindExisting(ctx, in.StreamID, in.IdempotencyKey)
+			if lookupErr != nil {
+				return domain.Event{}, false, fmt.Errorf("idempotency conflict lookup: %w", lookupErr)
+			}
+			if ok {
+				s.metrics.RecordIngest(in.StreamID, in.EventType, "duplicate")
+				s.metrics.ObserveIngestionDuration(time.Since(start).Seconds())
+				return existing, false, nil
+			}
+			return domain.Event{}, false, fmt.Errorf("idempotency conflict without existing event")
+		}
 		if errors.Is(err, domain.ErrSequenceConflict) {
 			latest++
 			continue
@@ -96,10 +108,9 @@ func (s *Service) BatchIngest(ctx context.Context, inputs []EventInput) []BatchR
 	results := make([]BatchResult, 0, len(inputs))
 	for _, in := range inputs {
 		if err := ValidateEventInput(in); err != nil {
-			return []BatchResult{{Status: "invalid", Error: err.Error(), Created: false}}
+			results = append(results, BatchResult{Status: "invalid", Error: err.Error(), Created: false})
+			continue
 		}
-	}
-	for _, in := range inputs {
 		event, created, err := s.Ingest(ctx, in)
 		if err != nil {
 			results = append(results, BatchResult{Status: "error", Error: err.Error(), Created: false})

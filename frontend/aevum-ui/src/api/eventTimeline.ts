@@ -23,8 +23,9 @@ export const eventTimelineApi: EventTimelineApi = {
 		return normalizeCursorPage(data, normalizeEvent)
 	},
 	async getEvent(eventId: string): Promise<Event> {
-		const { data } = await client.get<Event>(`/api/events/events/${eventId}`)
-		return normalizeEvent(data)
+		const { data } = await client.get<Event | { event?: Event }>(`/api/events/events/${eventId}`)
+		const payload = (data as { event?: unknown }).event ?? data
+		return normalizeEvent(payload)
 	},
 	async triggerReplay(req: ReplayRequest): Promise<ReplayResponse> {
 		const { data } = await client.post<{ status?: string; events_replayed?: number; eventsReplayed?: number }>('/api/events/admin/replay', {

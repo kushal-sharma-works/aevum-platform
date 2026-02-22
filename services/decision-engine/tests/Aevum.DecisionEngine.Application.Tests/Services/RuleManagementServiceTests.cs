@@ -66,6 +66,63 @@ public sealed class RuleManagementServiceTests
     }
 
     [Fact]
+    public async Task UpdateRuleAsync_ShouldCreateNewVersion()
+    {
+        var repository = Substitute.For<IRuleRepository>();
+        var existing = CreateRule("rule-1", RuleStatus.Active, 2);
+        var updates = CreateRule("rule-1", RuleStatus.Active, 0) with { Name = "Updated Name" };
+
+        repository.GetByIdAsync("rule-1", null, Arg.Any<CancellationToken>()).Returns(existing);
+        repository.GetLatestVersionAsync("rule-1", Arg.Any<CancellationToken>()).Returns(2);
+        repository.CreateAsync(Arg.Any<Rule>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Rule>());
+
+        var service = new RuleManagementService(repository, TimeProvider.System);
+
+        var updated = await service.UpdateRuleAsync("rule-1", updates);
+
+        updated.Version.Should().Be(3);
+        updated.CreatedAt.Should().Be(existing.CreatedAt);
+        updated.CreatedBy.Should().Be(existing.CreatedBy);
+        updated.Name.Should().Be("Updated Name");
+        await repository.Received(1).CreateAsync(Arg.Is<Rule>(r => r.Version == 3), Arg.Any<CancellationToken>());
+        await repository.DidNotReceive().UpdateAsync(Arg.Any<Rule>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DeactivateRuleAsync_ShouldUpdateStatus()
+    {
+        var repository = Substitute.For<IRuleRepository>();
+        var existing = CreateRule("rule-1", RuleStatus.Active, 1);
+
+        repository.GetByIdAsync("rule-1", null, Arg.Any<CancellationToken>()).Returns(existing);
+        repository.UpdateAsync(Arg.Any<Rule>(), Arg.Any<CancellationToken>())
+            .Returns(ci => ci.Arg<Rule>());
+
+        var service = new RuleManagementService(repository, TimeProvider.System);
+
+        var deactivated = await service.DeactivateRuleAsync("rule-1");
+
+        deactivated.Status.Should().Be(RuleStatus.Inactive);
+        await repository.Received(1).UpdateAsync(Arg.Is<Rule>(r => r.Status == RuleStatus.Inactive), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task DeleteRuleAsync_ShouldDeleteWhenFound()
+    {
+        var repository = Substitute.For<IRuleRepository>();
+        var existing = CreateRule("rule-1");
+
+        repository.GetByIdAsync("rule-1", null, Arg.Any<CancellationToken>()).Returns(existing);
+
+        var service = new RuleManagementService(repository, TimeProvider.System);
+
+        await service.DeleteRuleAsync("rule-1");
+
+        await repository.Received(1).DeleteAsync("rule-1", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task GetRuleAsync_ShouldThrowWhenMissing()
     {
         var repository = Substitute.For<IRuleRepository>();

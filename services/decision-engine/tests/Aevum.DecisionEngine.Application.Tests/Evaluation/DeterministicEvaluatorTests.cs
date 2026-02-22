@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Aevum.DecisionEngine.Application.Evaluation;
 using Aevum.DecisionEngine.Domain.Enums;
+using Aevum.DecisionEngine.Domain.Exceptions;
 using Aevum.DecisionEngine.Domain.Models;
 
 namespace Aevum.DecisionEngine.Application.Tests.Evaluation;
@@ -48,6 +49,30 @@ public sealed class DeterministicEvaluatorTests
 
         // Assert
         hash1.Should().NotBe(hash2);
+    }
+
+    [Fact]
+    public void ComputeHash_WithDifferentTimestampSameRequest_ShouldReturnSameHash()
+    {
+        // Arrange
+        var rule = CreateTestRule();
+        var context1 = new EvaluationContext
+        {
+            Data = new Dictionary<string, object> { ["amount"] = 150 },
+            RequestId = "req-123",
+            Timestamp = new DateTimeOffset(2024, 1, 1, 0, 0, 0, TimeSpan.Zero)
+        };
+        var context2 = context1 with
+        {
+            Timestamp = new DateTimeOffset(2024, 1, 2, 0, 0, 0, TimeSpan.Zero)
+        };
+
+        // Act
+        var hash1 = _evaluator.ComputeHash(rule, context1);
+        var hash2 = _evaluator.ComputeHash(rule, context2);
+
+        // Assert
+        hash1.Should().Be(hash2);
     }
 
     [Fact]
@@ -198,6 +223,56 @@ public sealed class DeterministicEvaluatorTests
 
         // Assert
         result.IsMatch.Should().Be(expected);
+    }
+
+    [Fact]
+    public void Evaluate_WhenNotUsedAsBinaryOperator_ShouldThrowEvaluationException()
+    {
+        // Arrange
+        var rule = new Rule
+        {
+            Id = "rule-1",
+            Name = "Invalid Not Connector Rule",
+            Conditions =
+            [
+                new RuleCondition
+                {
+                    Field = "amount",
+                    Operator = ComparisonOperator.GreaterThan,
+                    Value = 100,
+                    LogicalOperator = LogicalOperator.Not
+                },
+                new RuleCondition
+                {
+                    Field = "status",
+                    Operator = ComparisonOperator.Equals,
+                    Value = "active"
+                }
+            ],
+            Actions = [CreateTestAction()],
+            Status = RuleStatus.Active,
+            Version = 1,
+            Priority = 10,
+            CreatedAt = DateTimeOffset.UtcNow,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
+
+        var context = new EvaluationContext
+        {
+            Data = new Dictionary<string, object>
+            {
+                ["amount"] = 150,
+                ["status"] = "active"
+            },
+            RequestId = "req-1",
+            Timestamp = DateTimeOffset.UtcNow
+        };
+
+        // Act
+        var action = () => _evaluator.Evaluate(rule, context);
+
+        // Assert
+        action.Should().Throw<EvaluationException>();
     }
 
     private static Rule CreateTestRule()

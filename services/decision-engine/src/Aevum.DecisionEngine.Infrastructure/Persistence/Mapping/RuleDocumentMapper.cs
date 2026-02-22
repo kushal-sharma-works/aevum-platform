@@ -11,7 +11,7 @@ public static class RuleDocumentMapper
     {
         return new RuleDocument
         {
-            Id = rule.Id,
+            RuleId = rule.Id,
             Name = rule.Name,
             Description = rule.Description,
             Conditions = rule.Conditions.Select(c => c.ToDocument()).ToList(),
@@ -33,7 +33,7 @@ public static class RuleDocumentMapper
     {
         return new Rule
         {
-            Id = doc.Id,
+            Id = doc.RuleId,
             Name = doc.Name,
             Description = doc.Description,
             Conditions = doc.Conditions.Select(c => c.ToDomain()).ToList(),

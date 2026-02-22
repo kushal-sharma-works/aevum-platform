@@ -198,7 +198,7 @@ Environment variables:
 | `SERVER_PORT` | HTTP server port | `8080` |
 | `ELASTICSEARCH_URLS` | Elasticsearch URLs (comma-separated) | `http://localhost:9200` |
 | `EVENT_TIMELINE_URL` | Event Timeline Service base URL | `http://localhost:8081` |
-| `DECISION_ENGINE_URL` | Decision Engine Service base URL | `http://localhost:5000` |
+| `DECISION_ENGINE_URL` | Decision Engine Service base URL | `http://localhost:8080` |
 | `SYNC_INTERVAL` | Sync interval in seconds | `5` |
 | `SYNC_MAX_BACKOFF` | Max backoff on sync failure (seconds) | `300` |
 

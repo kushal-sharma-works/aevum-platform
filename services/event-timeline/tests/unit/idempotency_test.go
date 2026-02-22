@@ -25,15 +25,15 @@ func TestIdempotencyFindExisting(t *testing.T) {
 		SchemaVersion: 1,
 	})
 	require.NoError(t, err)
-	store.byIdem = map[string]domain.Event{"idem-1": event}
+	store.byIdem = map[string]domain.Event{"stream-1#idem-1": event}
 
 	checker := ingest.NewIdempotencyChecker(store)
-	got, ok, err := checker.FindExisting(context.Background(), "idem-1")
+	got, ok, err := checker.FindExisting(context.Background(), "stream-1", "idem-1")
 	require.NoError(t, err)
 	require.True(t, ok)
 	require.Equal(t, event.EventID, got.EventID)
 
-	_, ok, err = checker.FindExisting(context.Background(), "idem-2")
+	_, ok, err = checker.FindExisting(context.Background(), "stream-1", "idem-2")
 	require.NoError(t, err)
 	require.False(t, ok)
 }
@@ -49,7 +49,7 @@ func (m *mockEventStore) PutEvent(_ context.Context, e domain.Event) error {
 		m.byIdem = map[string]domain.Event{}
 	}
 	if e.IdempotencyKey != "" {
-		m.byIdem[e.IdempotencyKey] = e
+		m.byIdem[e.StreamID+"#"+e.IdempotencyKey] = e
 	}
 	return nil
 }
@@ -60,8 +60,8 @@ func (m *mockEventStore) GetByEventID(context.Context, string) (domain.Event, er
 	return domain.Event{}, fmt.Errorf("not implemented")
 }
 
-func (m *mockEventStore) FindByIdempotencyKey(_ context.Context, key string) (domain.Event, error) {
-	e, ok := m.byIdem[key]
+func (m *mockEventStore) FindByIdempotencyKey(_ context.Context, streamID, key string) (domain.Event, error) {
+	e, ok := m.byIdem[streamID+"#"+key]
 	if !ok {
 		return domain.Event{}, fmt.Errorf("missing: %w", domain.ErrNotFound)
 	}

@@ -35,6 +35,18 @@ func (sh *SearchHandler) Handle(c *gin.Context) {
 	if pageSizeInt < 1 {
 		pageSizeInt = 50
 	}
+	if pageSizeInt > 200 {
+		pageSizeInt = 200
+	}
+
+	if query == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "query is required", "code": string(domain.ErrInvalidQuery)})
+		return
+	}
+	if queryType != "all" && queryType != "events" && queryType != "decisions" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "type must be one of: all, events, decisions", "code": string(domain.ErrInvalidQuery)})
+		return
+	}
 
 	sq := &domain.SearchQuery{
 		Query:    query,
@@ -44,7 +56,7 @@ func (sh *SearchHandler) Handle(c *gin.Context) {
 		Size:     pageSizeInt,
 	}
 
-	from := pageInt * pageSizeInt
+	from := (pageInt - 1) * pageSizeInt
 	results, err := sh.engine.Search(c, sq.Query, sq.Type, sq.StreamID, from, sq.Size)
 	if err != nil {
 		if domErr, ok := err.(*domain.DomainError); ok {

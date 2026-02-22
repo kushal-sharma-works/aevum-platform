@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -31,7 +32,7 @@ func (s *testEventStore) PutEvent(_ context.Context, event domain.Event) error {
 		s.byIdem = map[string]domain.Event{}
 	}
 	if event.IdempotencyKey != "" {
-		s.byIdem[event.IdempotencyKey] = event
+		s.byIdem[event.StreamID+"#"+event.IdempotencyKey] = event
 	}
 	return nil
 }
@@ -43,7 +44,7 @@ func (s *testEventStore) PutEventsBatch(_ context.Context, events []domain.Event
 			if s.byIdem == nil {
 				s.byIdem = map[string]domain.Event{}
 			}
-			s.byIdem[event.IdempotencyKey] = event
+			s.byIdem[event.StreamID+"#"+event.IdempotencyKey] = event
 		}
 	}
 	return nil
@@ -61,8 +62,8 @@ func (s *testEventStore) GetByEventID(_ context.Context, eventID string) (domain
 	return domain.Event{}, domain.ErrNotFound
 }
 
-func (s *testEventStore) FindByIdempotencyKey(_ context.Context, key string) (domain.Event, error) {
-	event, ok := s.byIdem[key]
+func (s *testEventStore) FindByIdempotencyKey(_ context.Context, streamID, key string) (domain.Event, error) {
+	event, ok := s.byIdem[streamID+"#"+key]
 	if !ok {
 		return domain.Event{}, domain.ErrNotFound
 	}
@@ -103,6 +104,43 @@ type fixedGenerator struct{}
 
 func (fixedGenerator) New(time.Time) (string, error) { return "01HFIXEDID", nil }
 
+type captureStreamStore struct {
+	fromSequence int64
+	direction    string
+}
+
+type failingPutStore struct{}
+
+func (f *failingPutStore) PutEvent(context.Context, domain.Event) error { return errors.New("put failed") }
+func (f *failingPutStore) PutEventsBatch(context.Context, []domain.Event) error { return nil }
+func (f *failingPutStore) GetByEventID(context.Context, string) (domain.Event, error) {
+	return domain.Event{}, domain.ErrNotFound
+}
+func (f *failingPutStore) FindByIdempotencyKey(context.Context, string, string) (domain.Event, error) {
+	return domain.Event{}, domain.ErrNotFound
+}
+func (f *failingPutStore) GetLatestSequence(context.Context, string) (int64, error) { return 0, nil }
+func (f *failingPutStore) QueryByStream(context.Context, string, int64, string, int32) ([]domain.Event, int64, bool, error) {
+	return nil, 0, false, nil
+}
+
+func (s *captureStreamStore) PutEvent(context.Context, domain.Event) error         { return nil }
+func (s *captureStreamStore) PutEventsBatch(context.Context, []domain.Event) error { return nil }
+func (s *captureStreamStore) GetByEventID(context.Context, string) (domain.Event, error) {
+	return domain.Event{}, domain.ErrNotFound
+}
+func (s *captureStreamStore) FindByIdempotencyKey(context.Context, string, string) (domain.Event, error) {
+	return domain.Event{}, domain.ErrNotFound
+}
+func (s *captureStreamStore) GetLatestSequence(context.Context, string) (int64, error) {
+	return 5, nil
+}
+func (s *captureStreamStore) QueryByStream(_ context.Context, _ string, fromSequence int64, direction string, _ int32) ([]domain.Event, int64, bool, error) {
+	s.fromSequence = fromSequence
+	s.direction = direction
+	return []domain.Event{}, fromSequence, false, nil
+}
+
 func newIngestService(store *testEventStore) *ingest.Service {
 	return ingest.NewService(store, fixedGenerator{}, clock.MockClock{Current: time.Now().UTC()}, observability.NewMetrics())
 }
@@ -137,6 +175,22 @@ func TestIngestHandlerRejectsInvalidJSON(t *testing.T) {
 	r.ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestIngestHandlerReturnsInternalOnStoreError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	service := ingest.NewService(&failingPutStore{}, fixedGenerator{}, clock.MockClock{Current: time.Now().UTC()}, observability.NewMetrics())
+	handler := NewIngestHandler(service)
+	r := gin.New()
+	r.POST("/events", handler.Ingest)
+
+	body := `{"stream_id":"stream-1","event_type":"created","payload":{"v":1},"occurred_at":"2026-02-14T10:00:00Z","idempotency_key":"idem-1"}`
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/events", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+
+	r.ServeHTTP(rec, req)
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
 }
 
 func TestBatchIngestHandlerRejectsInvalidBatchSize(t *testing.T) {
@@ -177,6 +231,42 @@ func TestStreamHandlerGetByStreamInvalidLimit(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
+func TestStreamHandlerGetByStreamInvalidDirection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewStreamHandler(&testEventStore{})
+	r := gin.New()
+	r.GET("/streams/:streamId/events", handler.GetByStream)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/streams/s1/events?direction=sideways", nil))
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestStreamHandlerGetByStreamInvalidCursor(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewStreamHandler(&testEventStore{})
+	r := gin.New()
+	r.GET("/streams/:streamId/events", handler.GetByStream)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/streams/s1/events?cursor=invalid", nil))
+
+	require.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestEventHandlerGetByIDInternalError(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := NewEventHandler(&testEventStore{getByEventErr: errors.New("db unavailable")})
+	r := gin.New()
+	r.GET("/events/:eventId", handler.GetByID)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/events/evt-1", nil))
+
+	require.Equal(t, http.StatusInternalServerError, rec.Code)
+}
+
 func TestStreamHandlerGetByStreamSuccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	event, err := domain.NewEvent(domain.NewEventInput{
@@ -201,4 +291,19 @@ func TestStreamHandlerGetByStreamSuccess(t *testing.T) {
 
 	require.Equal(t, http.StatusOK, rec.Code)
 	require.Contains(t, rec.Body.String(), "events")
+}
+
+func TestStreamHandlerBackwardDefaultsToLatestSequence(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	store := &captureStreamStore{}
+	handler := NewStreamHandler(store)
+	r := gin.New()
+	r.GET("/streams/:streamId/events", handler.GetByStream)
+
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/streams/s1/events?direction=backward", nil))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Equal(t, int64(5), store.fromSequence)
+	require.Equal(t, domain.DirectionBackward, store.direction)
 }

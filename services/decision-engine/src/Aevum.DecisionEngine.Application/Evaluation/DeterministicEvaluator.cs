@@ -46,8 +46,8 @@ public sealed class DeterministicEvaluator(TimeProvider timeProvider) : IDetermi
         {
             RuleId = rule.Id,
             RuleVersion = rule.Version,
-            Context = SortDictionary(context.Data),
-            Timestamp = context.Timestamp.ToUnixTimeSeconds()
+            RequestId = context.RequestId,
+            Context = SortDictionary(context.Data)
         };
 
         var json = JsonSerializer.Serialize(hashInput, new JsonSerializerOptions
@@ -110,6 +110,14 @@ public sealed class DeterministicEvaluator(TimeProvider timeProvider) : IDetermi
                     var combinedResult = results[^2] || results[^1];
                     results.RemoveRange(results.Count - 2, 2);
                     results.Add(combinedResult);
+                }
+                else if (prevLogicalOp == LogicalOperator.Not)
+                {
+                    var previousCondition = conditions[results.Count - 2];
+                    throw new EvaluationException(
+                        ruleId,
+                        previousCondition.Field,
+                        "LogicalOperator.Not is only supported as a unary operator on the current condition");
                 }
             }
         }

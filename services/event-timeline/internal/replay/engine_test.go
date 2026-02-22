@@ -21,7 +21,7 @@ func (replayStore) PutEventsBatch(context.Context, []domain.Event) error { retur
 func (replayStore) GetByEventID(context.Context, string) (domain.Event, error) {
 	return domain.Event{}, domain.ErrNotFound
 }
-func (replayStore) FindByIdempotencyKey(context.Context, string) (domain.Event, error) {
+func (replayStore) FindByIdempotencyKey(context.Context, string, string) (domain.Event, error) {
 	return domain.Event{}, domain.ErrNotFound
 }
 func (replayStore) GetLatestSequence(context.Context, string) (int64, error) { return 0, nil }

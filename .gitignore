@@ -11,6 +11,7 @@
 
 # Logs
 *.log
+*.tmp
 
 # Dependency directories (added per service later)
 node_modules/
@@ -20,7 +21,17 @@ obj/
 # Test and coverage artifacts
 coverage/
 coverage-final/
+coverage-current/
+**/coverage/
+**/coverage-final/
+**/coverage-current/
+*.cobertura.xml
 *.out
+*.test
+
+# Build outputs
+dist/
+**/dist/
 
 # Frontend outputs
 frontend/aevum-ui/node_modules/

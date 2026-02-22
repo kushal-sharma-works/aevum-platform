@@ -10,14 +10,14 @@ COPY src/Aevum.DecisionEngine.Application/Aevum.DecisionEngine.Application.cspro
 COPY src/Aevum.DecisionEngine.Infrastructure/Aevum.DecisionEngine.Infrastructure.csproj src/Aevum.DecisionEngine.Infrastructure/
 
 # Restore dependencies
-RUN dotnet restore
+RUN dotnet restore src/Aevum.DecisionEngine.Api/Aevum.DecisionEngine.Api.csproj
 
 # Copy source code
 COPY src/ src/
 
 # Build
-RUN dotnet build -c Release --no-restore
-RUN dotnet publish src/Aevum.DecisionEngine.Api/Aevum.DecisionEngine.Api.csproj -c Release -o /app/publish --no-restore
+RUN dotnet build src/Aevum.DecisionEngine.Api/Aevum.DecisionEngine.Api.csproj -c Release
+RUN dotnet publish src/Aevum.DecisionEngine.Api/Aevum.DecisionEngine.Api.csproj -c Release -o /app/publish
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS runtime

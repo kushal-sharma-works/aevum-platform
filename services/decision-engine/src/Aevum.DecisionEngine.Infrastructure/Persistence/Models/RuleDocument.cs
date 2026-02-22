@@ -7,8 +7,10 @@ namespace Aevum.DecisionEngine.Infrastructure.Persistence.Models;
 public sealed class RuleDocument
 {
     [BsonId]
-    [BsonRepresentation(BsonType.String)]
-    public string Id { get; set; } = string.Empty;
+    public ObjectId InternalId { get; set; }
+
+    [BsonElement("ruleId")]
+    public string RuleId { get; set; } = string.Empty;
 
     [BsonElement("name")]
     public string Name { get; set; } = string.Empty;

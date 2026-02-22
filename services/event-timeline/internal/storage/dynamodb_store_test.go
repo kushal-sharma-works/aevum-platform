@@ -73,7 +73,7 @@ func TestDynamoDBEventStorePutEvent(t *testing.T) {
 	})
 
 	t.Run("sequence conflict", func(t *testing.T) {
-		body := `{"__type":"com.amazonaws.dynamodb.v20120810#ConditionalCheckFailedException","message":"conflict"}`
+		body := `{"__type":"com.amazonaws.dynamodb.v20120810#TransactionCanceledException","CancellationReasons":[{"Code":"ConditionalCheckFailed"},{"Code":"None"}],"message":"Transaction cancelled"}`
 		client, cleanup := testDynamoClient(t, dynamoHandler(http.StatusBadRequest, body))
 		defer cleanup()
 
@@ -107,7 +107,7 @@ func TestDynamoDBEventStoreQueries(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "evt-1", event.EventID)
 
-	idem, err := store.FindByIdempotencyKey(context.Background(), "idem-1")
+	idem, err := store.FindByIdempotencyKey(context.Background(), "stream-1", "idem-1")
 	require.NoError(t, err)
 	require.Equal(t, "evt-1", idem.EventID)
 
@@ -204,7 +204,7 @@ func TestDynamoDBEventStoreNotFoundAndErrors(t *testing.T) {
 	require.Error(t, err)
 	require.ErrorIs(t, err, domain.ErrNotFound)
 
-	_, err = store.FindByIdempotencyKey(context.Background(), "missing")
+	_, err = store.FindByIdempotencyKey(context.Background(), "stream-1", "missing")
 	require.Error(t, err)
 	require.ErrorIs(t, err, domain.ErrNotFound)
 

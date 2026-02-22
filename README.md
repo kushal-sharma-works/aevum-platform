@@ -1,6 +1,6 @@
 # Aevum
 
-**A distributed, deterministic, time-aware decision platform.**
+**A distributed, deterministic, time-aware decision platform (local-first in this repository).**
 
 Aevum enables organizations to make decisions in real time, then deterministically replay, audit, and simulate those decisions as if they happened at any point in the past.
 It combines immutable event ingestion, versioned rules, and traceable decision outputs to answer not only what happened, but why it happened.
@@ -79,7 +79,7 @@ flowchart TD
 | Service | Language | Purpose | Database | Port |
 |---------|----------|---------|----------|------|
 | Event Timeline | Go 1.22 (Gin + Echo) | Event ingestion, ordering, replay streaming | DynamoDB | 8080, 9090 |
-| Decision Engine | C# .NET 9 | Deterministic rule evaluation, versioned decisions | MongoDB | 8081 |
+| Decision Engine | C# .NET 9 | Deterministic rule evaluation, versioned decisions | MongoDB | 8080 |
 | Query & Audit | Go 1.22 (Gin) | Temporal search, correlation, diffing, audit trails | Elasticsearch | 8082 |
 | Frontend | Vue 3.5 + TypeScript 5.6 | Timeline viewer, decision inspector, replay console | — | 3000 |
 
@@ -95,13 +95,13 @@ Note: Monitoring endpoints are exposed separately (Prometheus `9090`, Grafana `3
 | Event Store | DynamoDB | — | Immutable append-only model with GSIs |
 | Rule Store | MongoDB (DocumentDB in AWS) | 7.0 | Flexible rule schema + version retention |
 | Search | Elasticsearch (OpenSearch) | 8.15 | Temporal and full-text querying |
-| Container Orchestration | Kubernetes (EKS) | 1.31 | Production orchestration and scaling |
-| IaC | Pulumi (TypeScript) | — | Type-safe multi-environment infrastructure |
-| CI/CD | GitHub Actions + GitLab CI | — | Cross-platform pipeline portability |
+| Container Orchestration | Kubernetes | 1.31 | Production orchestration and scaling (optional path) |
+| IaC | Pulumi (TypeScript) | — | Type-safe multi-environment infrastructure (optional path) |
+| CI/CD | GitHub Actions | — | Monorepo CI and validation |
 | GitOps | ArgoCD | — | Declarative deployment + self-heal |
 | Packaging | Docker, Helm | — | Reproducible builds and templated deploys |
 | Observability | OpenTelemetry, Prometheus, Grafana | — | Tracing, metrics, dashboards |
-| Cloud | AWS (EKS, DynamoDB, OpenSearch, Lambda, SQS, S3, CloudFront) | — | Managed, scalable cloud primitives |
+| Cloud | Optional (AWS-focused assets available) | — | Kept for future/optional deployment paths |
 
 ## Quick Start
 
@@ -111,36 +111,43 @@ Note: Monitoring endpoints are exposed separately (Prometheus `9090`, Grafana `3
 - Go 1.22+
 - .NET 9 SDK
 - Node.js 22+
-- AWS CLI (for local DynamoDB setup)
 
-### Run Everything Locally
+### Run Core Stack Locally
 
 ```bash
-make dev
+docker compose up -d --build
 ```
 
-This starts all services, databases, and monitoring.
+This starts the full local stack (`event-timeline`, `decision-engine`, `query-audit`, `aevum-ui`, MongoDB, DynamoDB local, Elasticsearch).
+
+`seed-data` runs automatically during startup and is configured as a prerequisite for `query-audit` and `aevum-ui`, so test data is seeded before UI/search flows are available.
+
+The default seeded dataset includes:
+- active rules visible on the Rules page,
+- seeded decisions visible on the Decisions page,
+- recent `default` stream events visible on Events and Timeline pages.
 
 | URL | Service |
 |-----|---------|
-| http://localhost:3000 | Frontend |
-| http://localhost:8080 | Event Timeline API |
-| http://localhost:8081 | Decision Engine API |
+| http://localhost:3000 | Aevum UI |
+| http://localhost:8081 | Event Timeline API |
+| http://localhost:9091 | Event Timeline Admin API |
+| http://localhost:8080 | Decision Engine API |
 | http://localhost:8082 | Query & Audit API |
-| http://localhost:9090 | Prometheus |
-| http://localhost:3001 | Grafana (`admin/admin`) |
 
-Seed test data:
+Check that all containers are healthy/running:
 
 ```bash
-make seed
+docker compose ps
 ```
 
-Run all tests:
+Re-run deterministic seed data manually (optional):
 
 ```bash
-make test
+docker compose run --rm seed-data
 ```
+
+Then refresh the UI at `http://localhost:3000`.
 
 ## Core Concepts
 
@@ -163,9 +170,9 @@ Each decision links to the triggering event, the rule version used, full evaluat
 ## Documentation
 
 - [Architecture](docs/architecture.md)
-- [Event Timeline OpenAPI](docs/api/event-timeline-openapi.yaml)
-- [Decision Engine OpenAPI](docs/api/decision-engine-openapi.yaml)
-- [Query & Audit OpenAPI](docs/api/query-audit-openapi.yaml)
+- [Event Timeline OpenAPI](api/event-timeline-openapi.yaml)
+- [Decision Engine OpenAPI](api/decision-engine-openapi.yaml)
+- [Query & Audit OpenAPI](api/query-audit-openapi.yaml)
 - [ADRs](docs/adr)
 - [Replay Model](docs/replay-model.md)
 - [Data Model](docs/data-model.md)
@@ -184,17 +191,16 @@ aevum-platform/
 ├── frontend/
 │   └── aevum-ui/             # Vue 3 + TypeScript — platform UI
 ├── devops/
-│   ├── pulumi/               # AWS infrastructure (TypeScript)
+│   ├── pulumi/               # Optional cloud infrastructure (TypeScript)
 │   ├── helm/                 # Kubernetes Helm charts
 │   ├── argocd/               # GitOps application manifests
 │   ├── monitoring/           # Prometheus, Grafana, OTel configs
 │   ├── k8s/                  # Base Kubernetes manifests
-│   └── scripts/              # Setup, seed, and utility scripts
+│   └── scripts/              # Local setup/seed and utility scripts
 ├── docs/                     # Architecture, ADRs, API specs, guides
 ├── .github/workflows/        # GitHub Actions CI/CD
-├── .gitlab-ci.yml            # GitLab CI equivalent
-├── docker-compose.yml        # Full local development environment
-└── Makefile                  # Root-level commands
+├── .gitlab-ci.yml            # Legacy/alternate CI definition
+└── docker-compose.yml        # Local development environment
 ```
 
 ## Architecture Decision Records

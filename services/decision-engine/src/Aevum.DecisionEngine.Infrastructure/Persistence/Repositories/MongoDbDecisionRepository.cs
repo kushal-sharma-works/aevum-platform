@@ -69,11 +69,4 @@ public sealed class MongoDbDecisionRepository : IDecisionRepository
         await _collection.InsertOneAsync(doc, cancellationToken: cancellationToken);
         return doc.ToDomain();
     }
-
-    public async Task<bool> ExistsByHashAsync(string deterministicHash, CancellationToken cancellationToken = default)
-    {
-        var filter = Builders<DecisionDocument>.Filter.Eq(d => d.DeterministicHash, deterministicHash);
-        var count = await _collection.CountDocumentsAsync(filter, cancellationToken: cancellationToken);
-        return count > 0;
-    }
 }
