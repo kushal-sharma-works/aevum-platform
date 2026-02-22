@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: aevum-sit
+
+resources:
+  - ../../base
+
+images:
+  - name: ghcr.io/kushal-sharma-works/aevum-decision-engine
+    newTag: latest
+  - name: ghcr.io/kushal-sharma-works/aevum-event-timeline
+    newTag: latest
+
+replicas:
+  - name: decision-engine
+    count: 2
+  - name: event-timeline
+    count: 2

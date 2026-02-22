@@ -1,0 +1,188 @@
+services:
+  mongodb:
+    image: mongo:8.0
+    container_name: aevum-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: decision_engine
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - aevum
+
+  dynamodb-local:
+    image: amazon/dynamodb-local:2.5.2
+    container_name: aevum-dynamodb-local
+    restart: unless-stopped
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-inMemory"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS http://localhost:8000 >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - aevum
+
+  dynamodb-init:
+    image: amazon/aws-cli:2.22.23
+    container_name: aevum-dynamodb-init
+    restart: on-failure
+    depends_on:
+      dynamodb-local:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c", "sh /seed/dynamodb-init.sh"]
+    volumes:
+      - ./devops/scripts:/seed:ro
+    networks:
+      - aevum
+
+  event-timeline:
+    build:
+      context: ./services/event-timeline
+      dockerfile: Dockerfile
+    container_name: aevum-event-timeline
+    restart: unless-stopped
+    depends_on:
+      dynamodb-init:
+        condition: service_completed_successfully
+    environment:
+      AEVUM_LOG_LEVEL: info
+      AEVUM_GIN_PORT: 8080
+      AEVUM_ECHO_PORT: 9090
+      AEVUM_DYNAMODB_ENDPOINT: http://dynamodb-local:8000
+      AEVUM_DYNAMODB_TABLE: aevum-events
+      AEVUM_AWS_REGION: eu-central-1
+      AWS_ACCESS_KEY_ID: local
+      AWS_SECRET_ACCESS_KEY: local
+      AWS_DEFAULT_REGION: eu-central-1
+      AEVUM_JWT_SECRET: dev-local-secret
+      AEVUM_OTEL_ENDPOINT: localhost:4317
+      AEVUM_RATE_LIMIT_BURST: 100
+      AEVUM_RATE_LIMIT_RATE: 50
+    networks:
+      - aevum
+
+  decision-engine:
+    build:
+      context: ./services/decision-engine
+      dockerfile: Dockerfile
+    container_name: aevum-decision-engine
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      event-timeline:
+        condition: service_started
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: Development
+      MongoDB__ConnectionString: mongodb://mongodb:27017
+      MongoDB__DatabaseName: decision_engine
+      EventTimeline__BaseUrl: http://event-timeline:8080
+      Observability__OtlpEndpoint: ""
+    networks:
+      - aevum
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: aevum-elasticsearch
+    restart: unless-stopped
+    environment:
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      xpack.security.enrollment.enabled: "false"
+      ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sS http://localhost:9200/_cluster/health >/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+    networks:
+      - aevum
+
+  query-audit:
+    build:
+      context: ./services/query-audit
+      dockerfile: Dockerfile
+    container_name: aevum-query-audit
+    restart: unless-stopped
+    depends_on:
+      elasticsearch:
+        condition: service_healthy
+      event-timeline:
+        condition: service_started
+      decision-engine:
+        condition: service_started
+      seed-data:
+        condition: service_completed_successfully
+    environment:
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      ELASTICSEARCH_URLS: http://elasticsearch:9200
+      EVENT_TIMELINE_URL: http://event-timeline:8080
+      EVENT_TIMELINE_JWT_SECRET: dev-local-secret
+      DECISION_ENGINE_URL: http://decision-engine:8080
+      SYNC_INTERVAL: 30
+      SYNC_MAX_BACKOFF: 300
+      SYNC_BATCH_SIZE: 500
+      ENVIRONMENT: development
+    networks:
+      - aevum
+
+  aevum-ui:
+    build:
+      context: ./frontend/aevum-ui
+      dockerfile: Dockerfile
+    container_name: aevum-ui
+    restart: unless-stopped
+    depends_on:
+      event-timeline:
+        condition: service_started
+      decision-engine:
+        condition: service_started
+      query-audit:
+        condition: service_started
+      seed-data:
+        condition: service_completed_successfully
+    networks:
+      - aevum
+
+  seed-data:
+    image: alpine:3.20
+    container_name: aevum-seed-data
+    restart: "no"
+    depends_on:
+      event-timeline:
+        condition: service_started
+      decision-engine:
+        condition: service_started
+    entrypoint: ["/bin/sh", "-c"]
+    command: >
+      "
+      apk add --no-cache bash curl openssl coreutils >/dev/null &&
+      export EVENT_TIMELINE_URL=http://event-timeline:8080 &&
+      export EVENT_TIMELINE_HEALTH_URL=http://event-timeline:9090/admin/health &&
+      export EVENT_TIMELINE_JWT_SECRET=dev-local-secret &&
+      export DECISION_ENGINE_URL=http://decision-engine:8080 &&
+      export SEED_SOURCE=compose-auto-seed &&
+      bash /seed/seed-data.sh
+      "
+    volumes:
+      - ./devops/scripts:/seed:ro
+    networks:
+      - aevum
+
+networks:
+  aevum:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  elasticsearch_data:

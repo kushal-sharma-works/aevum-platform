@@ -1,0 +1,18 @@
+apiVersion: v2
+name: aevum-platform
+description: Umbrella chart for the complete Aevum platform
+type: application
+version: 0.1.0
+dependencies:
+  - name: event-timeline
+    version: "0.1.0"
+    repository: "file://../charts/event-timeline"
+  - name: decision-engine
+    version: "0.1.0"
+    repository: "file://../charts/decision-engine"
+  - name: query-audit
+    version: "0.1.0"
+    repository: "file://../charts/query-audit"
+  - name: aevum-ui
+    version: "0.1.0"
+    repository: "file://../charts/aevum-ui"

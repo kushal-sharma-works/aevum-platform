@@ -1,0 +1,13 @@
+replicaCount: 2
+image:
+  repository: 123456789012.dkr.ecr.eu-central-1.amazonaws.com/aevum-aevum-ui-sit
+  tag: latest
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 400m
+    memory: 512Mi
+ingress:
+  enabled: true

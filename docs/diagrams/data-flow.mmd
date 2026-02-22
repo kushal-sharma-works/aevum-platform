@@ -1,0 +1,24 @@
+flowchart LR
+    Producer[External Producer]
+    ET[Event Timeline]
+    DDB[(DynamoDB)]
+    Stream[DynamoDB Stream]
+    Lambda[Lambda Fanout]
+    SQS[(SQS)]
+    DE[Decision Engine]
+    MDB[(MongoDB)]
+    Sync[Query & Audit Sync Worker]
+    ES[(Elasticsearch/OpenSearch)]
+    UI[Frontend]
+
+    Producer -->|POST /api/v1/events| ET
+    ET -->|Conditional Put| DDB
+    DDB --> Stream
+    Stream --> Lambda
+    Lambda --> SQS
+    SQS --> DE
+    DE -->|Persist decisions + trace| MDB
+    Sync -->|Fetch events/decisions| ET
+    Sync -->|Fetch decisions| DE
+    Sync -->|Index projections| ES
+    UI -->|Search/timeline/audit| ES

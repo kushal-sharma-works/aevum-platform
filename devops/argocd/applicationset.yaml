@@ -1,0 +1,38 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: aevum-services
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - service: event-timeline
+            path: devops/helm/charts/event-timeline
+          - service: decision-engine
+            path: devops/helm/charts/decision-engine
+          - service: query-audit
+            path: devops/helm/charts/query-audit
+          - service: aevum-ui
+            path: devops/helm/charts/aevum-ui
+  template:
+    metadata:
+      name: '{{service}}-sit'
+      namespace: argocd
+    spec:
+      project: aevum
+      source:
+        repoURL: https://github.com/kushal-sharma-works/aevum-platform.git
+        targetRevision: main
+        path: '{{path}}'
+        helm:
+          valueFiles:
+            - values.yaml
+            - values-sit.yaml
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: aevum-sit
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
