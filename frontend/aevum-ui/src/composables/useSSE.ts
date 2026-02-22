@@ -1,4 +1,4 @@
-import { isRef, onUnmounted, ref, type Ref } from 'vue'
+import { getCurrentInstance, isRef, onUnmounted, ref, type Ref } from 'vue'
 
 export type SSEStatus = 'connecting' | 'open' | 'closed' | 'error'
 
@@ -49,7 +49,9 @@ export function useSSE(url: string | Ref<string>) {
 	}
 
 	connect()
-	onUnmounted(close)
+	if (getCurrentInstance()) {
+		onUnmounted(close)
+	}
 
 	return { data, error, status, close }
 }

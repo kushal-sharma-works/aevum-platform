@@ -4,10 +4,27 @@ defineProps<{ options: ReadonlyArray<{ readonly label: string; readonly value: s
 </script>
 
 <template>
-	<label class="block space-y-1">
-		<span v-if="label" class="text-xs text-slate-300">{{ label }}</span>
-		<select v-model="model" class="w-full rounded bg-slate-900 px-3 py-2 text-sm">
+	<label class="base-field">
+		<span v-if="label" class="base-field-label">{{ label }}</span>
+		<select v-model="model" class="p-inputtext p-component base-input">
 			<option v-for="option in options" :key="option.value" :value="option.value">{{ option.label }}</option>
 		</select>
 	</label>
 </template>
+
+<style scoped>
+.base-field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.base-field-label {
+	font-size: 0.85rem;
+	color: var(--p-text-muted-color);
+}
+
+.base-input {
+	width: 100%;
+}
+</style>

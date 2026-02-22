@@ -1,12 +1,13 @@
 import client from './client'
 import type { EventTimelineApi } from './types'
-import type { BatchIngestRequest, BatchIngestResponse, Event, IngestEventRequest, ReplayRequest } from '@/types/event'
+import { normalizeCursorPage, normalizeEvent } from './normalizers'
+import type { BatchIngestRequest, BatchIngestResponse, Event, IngestEventRequest, ReplayRequest, ReplayResponse } from '@/types/event'
 import type { CursorPage } from '@/types/common'
 
 export const eventTimelineApi: EventTimelineApi = {
 	async ingestEvent(req: IngestEventRequest): Promise<Event> {
 		const { data } = await client.post<Event>('/api/events/events', req)
-		return data
+		return normalizeEvent(data)
 	},
 	async batchIngest(req: BatchIngestRequest): Promise<BatchIngestResponse> {
 		const { data } = await client.post<BatchIngestResponse>('/api/events/events/batch', req)
@@ -19,13 +20,23 @@ export const eventTimelineApi: EventTimelineApi = {
 				limit
 			}
 		})
-		return data
+		return normalizeCursorPage(data, normalizeEvent)
 	},
 	async getEvent(eventId: string): Promise<Event> {
 		const { data } = await client.get<Event>(`/api/events/events/${eventId}`)
-		return data
+		return normalizeEvent(data)
 	},
-	async triggerReplay(req: ReplayRequest): Promise<void> {
-		await client.post('/api/events/admin/replay', req)
+	async triggerReplay(req: ReplayRequest): Promise<ReplayResponse> {
+		const { data } = await client.post<{ status?: string; events_replayed?: number; eventsReplayed?: number }>('/api/events/admin/replay', {
+			stream_id: req.streamId,
+			from: req.from,
+			to: req.to,
+			speed_factor: req.speed
+		})
+
+		return {
+			status: data.status ?? 'completed',
+			eventsReplayed: Number(data.eventsReplayed ?? data.events_replayed ?? 0)
+		}
 	}
 }

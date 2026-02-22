@@ -2,6 +2,18 @@ import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios'
 import type { ApiError } from '@/types/common'
 
 const RETRY_KEY = 'x-aevum-retry-count'
+export const LOCAL_SESSION_TOKEN = 'aevum-local-session'
+
+let isHandlingUnauthorized = false
+
+export function resetUnauthorizedHandling(): void {
+	isHandlingUnauthorized = false
+}
+
+function isJwtLikeToken(token: string): boolean {
+	const segments = token.split('.')
+	return segments.length === 3 && segments.every((segment) => segment.length > 0)
+}
 
 const client = axios.create({
 	timeout: 15000,
@@ -12,7 +24,7 @@ const client = axios.create({
 
 client.interceptors.request.use((config: InternalAxiosRequestConfig) => {
 	const token = localStorage.getItem('aevum_token')
-	if (token) {
+	if (token && isJwtLikeToken(token)) {
 		config.headers.Authorization = `Bearer ${token}`
 	}
 	return config
@@ -26,8 +38,9 @@ client.interceptors.response.use(
 
 		if (status === 401) {
 			localStorage.removeItem('aevum_token')
-			if (window.location.pathname !== '/login') {
-				window.location.href = '/login'
+			if (!isHandlingUnauthorized && window.location.pathname !== '/login') {
+				isHandlingUnauthorized = true
+				window.dispatchEvent(new CustomEvent('aevum:auth-required'))
 			}
 		}
 
@@ -48,7 +61,7 @@ client.interceptors.response.use(
 			title: payload?.title ?? 'Request failed',
 			status: payload?.status ?? status ?? 500,
 			detail: payload?.detail ?? error.message,
-			traceId: payload?.traceId
+			...(payload?.traceId ? { traceId: payload.traceId } : {})
 		}
 
 		return Promise.reject(normalized)

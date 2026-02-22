@@ -19,11 +19,13 @@ const emit = defineEmits<{
 </script>
 
 <template>
-	<div class="flex items-center gap-2">
-		<button class="rounded bg-slate-800 px-3 py-1" :disabled="page <= 1" @click="emit('prev')">Prev</button>
-		<span class="text-sm text-slate-400">Page {{ page }} / {{ totalPages }}</span>
-		<button class="rounded bg-slate-800 px-3 py-1" :disabled="!hasMore && page >= totalPages" @click="emit('next')">
-			Next
-		</button>
+	<div class="row items-center q-col-gutter-sm">
+		<div>
+			<button type="button" class="p-button p-button-outlined" :disabled="page <= 1" @click="emit('prev')">Prev</button>
+		</div>
+		<div class="text-caption text-grey-7">Page {{ page }} / {{ totalPages }}</div>
+		<div>
+			<button type="button" class="p-button p-button-outlined" :disabled="!hasMore && page >= totalPages" @click="emit('next')">Next</button>
+		</div>
 	</div>
 </template>

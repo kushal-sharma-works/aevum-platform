@@ -1,12 +1,29 @@
 <script setup lang="ts">
 const model = defineModel<string>({ required: true })
-defineProps<{ label?: string; placeholder?: string; error?: string }>()
+defineProps<{ label?: string; placeholder?: string; error?: string; type?: string }>()
 </script>
 
 <template>
-	<label class="block space-y-1">
-		<span v-if="label" class="text-xs text-slate-300">{{ label }}</span>
-		<input v-model="model" :placeholder="placeholder" class="w-full rounded bg-slate-900 px-3 py-2 text-sm" />
-		<span v-if="error" class="text-xs text-rose-300">{{ error }}</span>
+	<label class="base-field">
+		<span v-if="label" class="base-field-label">{{ label }}</span>
+		<input v-model="model" :type="type ?? 'text'" :placeholder="placeholder" class="p-inputtext p-component base-input" />
+		<small v-if="error" class="p-error">{{ error }}</small>
 	</label>
 </template>
+
+<style scoped>
+.base-field {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+
+.base-field-label {
+	font-size: 0.85rem;
+	color: var(--p-text-muted-color);
+}
+
+.base-input {
+	width: 100%;
+}
+</style>

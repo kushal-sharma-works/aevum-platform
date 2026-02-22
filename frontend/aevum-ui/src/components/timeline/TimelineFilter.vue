@@ -4,8 +4,38 @@ const type = defineModel<string>('type', { required: true })
 </script>
 
 <template>
-	<div class="grid gap-2 md:grid-cols-2">
-		<input v-model="streamId" class="rounded bg-slate-900 px-2 py-1" placeholder="Stream ID" />
-		<input v-model="type" class="rounded bg-slate-900 px-2 py-1" placeholder="Type" />
+	<div class="timeline-filter">
+		<label class="filter-field">
+			<span>Stream ID</span>
+			<input v-model="streamId" class="p-inputtext p-component" />
+		</label>
+		<label class="filter-field">
+			<span>Type</span>
+			<input v-model="type" class="p-inputtext p-component" />
+		</label>
 	</div>
 </template>
+
+<style scoped>
+.timeline-filter {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+@media (max-width: 900px) {
+	.timeline-filter {
+		grid-template-columns: 1fr;
+	}
+}
+
+.filter-field {
+	display: grid;
+	gap: 0.35rem;
+}
+
+.filter-field span {
+	font-size: 0.85rem;
+	color: var(--p-text-muted-color);
+}
+</style>

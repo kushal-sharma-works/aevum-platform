@@ -33,11 +33,13 @@ export const useTimelineStore = defineStore('timeline', () => {
 	async function fetchTimeline(streamId?: string, from?: string, to?: string, type?: string): Promise<void> {
 		isLoading.value = true
 		error.value = null
+		const fromValue = from ?? timeRange.value.from.toISOString()
+		const toValue = to ?? timeRange.value.to.toISOString()
 		try {
 			const response = await queryAuditApi.getTimeline({
 				stream_id: streamId,
-				from,
-				to,
+				from: fromValue,
+				to: toValue,
 				type,
 				page: 1,
 				size: 200

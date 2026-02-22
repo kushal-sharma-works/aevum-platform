@@ -1,4 +1,5 @@
 import client from './client'
+import { normalizeAuditTrail, normalizePaginatedResponse, normalizeTimelineResponse } from './normalizers'
 import type {
 	CorrelateParams,
 	CorrelationResult,
@@ -15,19 +16,27 @@ import type { TimelineEntry } from '@/types/timeline'
 
 export const queryAuditApi: QueryAuditApi = {
 	async search(query: string, filters?: SearchFilters): Promise<PaginatedResponse<SearchResult>> {
+		const mappedFilters = filters
+			? {
+				...filters,
+				stream_id: filters.streamId,
+				type: filters.type === 'decision' ? 'decisions' : filters.type === 'event' ? 'events' : filters.type
+			}
+			: undefined
+
 		const { data } = await client.get<PaginatedResponse<SearchResult>>('/api/query/search', {
 			params: {
-				query,
-				...filters
+				q: query,
+				...mappedFilters
 			}
 		})
-		return data
+		return normalizePaginatedResponse(data, (item) => item as SearchResult)
 	},
 	async getTimeline(params: TimelineParams): Promise<PaginatedResponse<TimelineEntry>> {
 		const { data } = await client.get<PaginatedResponse<TimelineEntry>>('/api/query/timeline', {
 			params
 		})
-		return data
+		return normalizeTimelineResponse(data)
 	},
 	async correlate(params: CorrelateParams): Promise<CorrelationResult> {
 		const { data } = await client.get<CorrelationResult>('/api/query/correlate', {
@@ -43,6 +52,6 @@ export const queryAuditApi: QueryAuditApi = {
 	},
 	async getAuditTrail(decisionId: string): Promise<AuditTrail> {
 		const { data } = await client.get<AuditTrail>(`/api/query/audit/${decisionId}`)
-		return data
+		return normalizeAuditTrail(data)
 	}
 }

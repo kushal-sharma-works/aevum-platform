@@ -5,7 +5,18 @@ defineProps<{ chain: CausalChain }>()
 </script>
 
 <template>
-	<div class="rounded border border-slate-800 p-3 text-xs">
+	<section class="causal-banner">
 		Nodes: {{ chain.nodes.length }} | Edges: {{ chain.edges.length }}
-	</div>
+	</section>
 </template>
+
+<style scoped>
+.causal-banner {
+	border: 1px solid var(--p-content-border-color);
+	border-radius: 0.75rem;
+	background: var(--p-content-background);
+	padding: 0.65rem 0.75rem;
+	font-size: 0.8rem;
+	color: var(--p-text-muted-color);
+}
+</style>

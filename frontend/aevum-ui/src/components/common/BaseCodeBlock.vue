@@ -3,5 +3,22 @@ defineProps<{ code: string }>()
 </script>
 
 <template>
-	<pre class="overflow-auto rounded bg-slate-900 p-3 text-xs text-slate-100"><code>{{ code }}</code></pre>
+	<section class="base-code">
+		<pre class="base-pre"><code>{{ code }}</code></pre>
+	</section>
 </template>
+
+<style scoped>
+.base-code {
+	border: 1px solid var(--p-content-border-color);
+	border-radius: 0.75rem;
+	background: var(--p-content-background);
+	padding: 0.75rem;
+}
+
+.base-pre {
+	margin: 0;
+	overflow: auto;
+	font-size: 0.75rem;
+}
+</style>

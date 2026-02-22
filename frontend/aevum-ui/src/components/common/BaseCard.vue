@@ -1,5 +1,14 @@
 <template>
-	<div class="rounded border border-slate-800 bg-slate-950 p-3">
+	<section class="base-card">
 		<slot />
-	</div>
+	</section>
 </template>
+
+<style scoped>
+.base-card {
+	border: 1px solid var(--p-content-border-color);
+	background: var(--p-content-background);
+	border-radius: 0.75rem;
+	padding: 1rem;
+}
+</style>

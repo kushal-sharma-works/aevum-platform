@@ -4,14 +4,6 @@ import type { Decision } from '@/types/decision'
 
 const props = defineProps<{ decisions: ReadonlyArray<Decision> }>()
 
-const columns = [
-	{ name: 'decisionId', label: 'Decision ID', field: 'decisionId', align: 'left' as const, sortable: true },
-	{ name: 'rule', label: 'Rule', field: 'ruleId', align: 'left' as const, sortable: true },
-	{ name: 'version', label: 'Version', field: 'ruleVersion', align: 'left' as const, sortable: true },
-	{ name: 'status', label: 'Status', field: 'status', align: 'left' as const, sortable: true },
-	{ name: 'evaluatedAt', label: 'Evaluated At', field: 'evaluatedAt', align: 'left' as const, sortable: true }
-]
-
 const rows = computed(() => props.decisions)
 
 const statusColor = (status: Decision['status']) => {
@@ -27,30 +19,52 @@ const statusColor = (status: Decision['status']) => {
 </script>
 
 <template>
-	<q-table
-		flat
-		bordered
-		row-key="decisionId"
-		:rows="rows"
-		:columns="columns"
-		:pagination="{ rowsPerPage: 20 }"
-	>
-		<template #body-cell-decisionId="scope">
-			<q-td :props="scope">
-				<RouterLink :to="`/decisions/${scope.row.decisionId}`" class="text-primary text-weight-medium">
-					{{ scope.row.decisionId }}
-				</RouterLink>
-			</q-td>
-		</template>
-
-		<template #body-cell-rule="scope">
-			<q-td :props="scope">{{ scope.row.ruleId }}</q-td>
-		</template>
-
-		<template #body-cell-status="scope">
-			<q-td :props="scope">
-				<q-badge :color="statusColor(scope.row.status)" text-color="white">{{ scope.row.status }}</q-badge>
-			</q-td>
-		</template>
-	</q-table>
+	<table class="decision-table">
+		<thead>
+			<tr>
+				<th>Decision ID</th>
+				<th>Rule</th>
+				<th>Version</th>
+				<th>Status</th>
+				<th>Evaluated At</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr v-for="row in rows" :key="row.decisionId">
+				<td><RouterLink :to="`/decisions/${row.decisionId}`" class="link">{{ row.decisionId }}</RouterLink></td>
+				<td>{{ row.ruleId }}</td>
+				<td>{{ row.ruleVersion }}</td>
+				<td><span class="p-tag" :class="`p-tag-${statusColor(row.status) === 'positive' ? 'success' : statusColor(row.status) === 'warning' ? 'warn' : 'danger'}`">{{ row.status }}</span></td>
+				<td>{{ row.evaluatedAt }}</td>
+			</tr>
+		</tbody>
+	</table>
 </template>
+
+<style scoped>
+.decision-table {
+	width: 100%;
+	border-collapse: collapse;
+	border: 1px solid var(--p-content-border-color);
+	border-radius: 0.75rem;
+	overflow: hidden;
+	background: var(--p-content-background);
+}
+
+.decision-table th,
+.decision-table td {
+	text-align: left;
+	padding: 0.625rem;
+	border-bottom: 1px solid var(--p-content-border-color);
+}
+
+.decision-table tr:last-child td {
+	border-bottom: none;
+}
+
+.link {
+	text-decoration: none;
+	color: var(--p-primary-color);
+	font-weight: 600;
+}
+</style>

@@ -1,83 +1,110 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
+import { useDecisionsStore } from '@/stores/decisions'
+import { useEventsStore } from '@/stores/events'
+import { useRulesStore } from '@/stores/rules'
 
-const totals = ref({
-	events: 0,
-	decisions: 0,
-	activeRules: 0,
-	avgLatency: 0
+const eventsStore = useEventsStore()
+const decisionsStore = useDecisionsStore()
+const rulesStore = useRulesStore()
+
+const totals = computed(() => {
+	const decisions = decisionsStore.decisions
+	const avgLatency = decisions.length
+		? Math.round(decisions.reduce((sum, decision) => sum + (decision.trace?.durationMs ?? 0), 0) / decisions.length)
+		: 0
+
+	return {
+		events: eventsStore.events.length,
+		decisions: decisions.length,
+		activeRules: rulesStore.rules.length,
+		avgLatency
+	}
 })
 
-let timer: number | undefined
-
-const refresh = () => {
-	totals.value = {
-		events: totals.value.events + 10,
-		decisions: totals.value.decisions + 4,
-		activeRules: Math.max(1, totals.value.activeRules || 3),
-		avgLatency: 42
-	}
-}
-
-onMounted(() => {
-	refresh()
-	timer = window.setInterval(refresh, 30_000)
-})
-
-onUnmounted(() => {
-	if (timer !== undefined) {
-		window.clearInterval(timer)
-	}
+onMounted(async () => {
+	await Promise.all([
+		eventsStore.fetchStreamEvents('default', undefined, 200),
+		rulesStore.fetchRules(),
+		decisionsStore.fetchDecisions({ page: 1, pageSize: 200 })
+	])
 })
 </script>
 
 <template>
-	<section class="q-gutter-md">
-		<div class="row q-col-gutter-md">
-			<div class="col-12 col-sm-6 col-lg-3">
-				<q-card flat bordered>
-					<q-card-section>
-						<div class="text-caption text-grey-7">Total Events</div>
-						<div class="text-h6">{{ totals.events }}</div>
-					</q-card-section>
-				</q-card>
-			</div>
-			<div class="col-12 col-sm-6 col-lg-3">
-				<q-card flat bordered>
-					<q-card-section>
-						<div class="text-caption text-grey-7">Total Decisions</div>
-						<div class="text-h6">{{ totals.decisions }}</div>
-					</q-card-section>
-				</q-card>
-			</div>
-			<div class="col-12 col-sm-6 col-lg-3">
-				<q-card flat bordered>
-					<q-card-section>
-						<div class="text-caption text-grey-7">Active Rules</div>
-						<div class="text-h6">{{ totals.activeRules }}</div>
-					</q-card-section>
-				</q-card>
-			</div>
-			<div class="col-12 col-sm-6 col-lg-3">
-				<q-card flat bordered>
-					<q-card-section>
-						<div class="text-caption text-grey-7">Avg Latency</div>
-						<div class="text-h6">{{ totals.avgLatency }}ms</div>
-					</q-card-section>
-				</q-card>
-			</div>
+	<section class="dashboard-overview">
+		<div class="metrics-grid">
+			<section class="overview-card">
+				<div class="overview-label">Total Events</div>
+				<div class="overview-value">{{ totals.events }}</div>
+			</section>
+			<section class="overview-card">
+				<div class="overview-label">Total Decisions</div>
+				<div class="overview-value">{{ totals.decisions }}</div>
+			</section>
+			<section class="overview-card">
+				<div class="overview-label">Active Rules</div>
+				<div class="overview-value">{{ totals.activeRules }}</div>
+			</section>
+			<section class="overview-card">
+				<div class="overview-label">Avg Latency</div>
+				<div class="overview-value">{{ totals.avgLatency }}ms</div>
+			</section>
 		</div>
 
-		<div class="row q-col-gutter-md">
-			<div class="col-12 col-md-4">
-				<q-banner rounded class="bg-blue-1 text-blue-9">IngestionRateChart placeholder</q-banner>
-			</div>
-			<div class="col-12 col-md-4">
-				<q-banner rounded class="bg-teal-1 text-teal-9">DecisionLatencyChart placeholder</q-banner>
-			</div>
-			<div class="col-12 col-md-4">
-				<q-banner rounded class="bg-orange-1 text-orange-9">ErrorRateChart placeholder</q-banner>
-			</div>
+		<div class="charts-grid">
+			<section class="chart-placeholder">IngestionRateChart placeholder</section>
+			<section class="chart-placeholder">DecisionLatencyChart placeholder</section>
+			<section class="chart-placeholder">ErrorRateChart placeholder</section>
 		</div>
 	</section>
 </template>
+
+<style scoped>
+.dashboard-overview {
+	display: grid;
+	gap: 0.85rem;
+}
+
+.metrics-grid {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+.charts-grid {
+	display: grid;
+	grid-template-columns: repeat(3, minmax(0, 1fr));
+	gap: 0.75rem;
+}
+
+@media (max-width: 1100px) {
+	.metrics-grid,
+	.charts-grid {
+		grid-template-columns: 1fr;
+	}
+}
+
+.overview-card,
+.chart-placeholder {
+	border: 1px solid var(--p-content-border-color);
+	border-radius: 0.75rem;
+	background: var(--p-content-background);
+	padding: 0.75rem;
+}
+
+.overview-label {
+	font-size: 0.8rem;
+	color: var(--p-text-muted-color);
+}
+
+.overview-value {
+	font-size: 1.2rem;
+	font-weight: 600;
+}
+
+.chart-placeholder {
+	font-size: 0.9rem;
+	color: var(--p-text-muted-color);
+}
+</style>

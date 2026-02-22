@@ -31,15 +31,54 @@ function remove(index: number): void {
 </script>
 
 <template>
-	<div class="space-y-2">
-		<div v-for="(condition, index) in model" :key="index" class="grid grid-cols-12 gap-2">
-			<input v-model="condition.field" class="col-span-4 rounded bg-slate-900 px-2 py-1" placeholder="Field" />
-			<select v-model="condition.operator" class="col-span-3 rounded bg-slate-900 px-2 py-1">
-				<option v-for="op in operators" :key="op" :value="op">{{ op }}</option>
-			</select>
-			<input v-model="condition.value" class="col-span-4 rounded bg-slate-900 px-2 py-1" placeholder="Value" />
-			<button class="col-span-1 rounded bg-rose-700 px-2" @click="remove(index)">-</button>
+	<div class="condition-builder">
+		<div v-for="(condition, index) in model" :key="index" class="condition-row">
+			<label class="condition-field">
+				<span>Field</span>
+				<input v-model="condition.field" class="p-inputtext p-component" />
+			</label>
+			<label class="condition-field">
+				<span>Operator</span>
+				<select v-model="condition.operator" class="p-inputtext p-component">
+					<option v-for="operator in operators" :key="operator" :value="operator">{{ operator }}</option>
+				</select>
+			</label>
+			<label class="condition-field">
+				<span>Value</span>
+				<input v-model="condition.value" class="p-inputtext p-component" />
+			</label>
+			<button type="button" class="p-button p-component p-button-danger p-button-sm" @click="remove(index)">Remove</button>
 		</div>
 		<BaseButton variant="secondary" @click="add">Add Condition</BaseButton>
 	</div>
 </template>
+
+<style scoped>
+.condition-builder {
+	display: grid;
+	gap: 0.75rem;
+}
+
+.condition-row {
+	display: grid;
+	grid-template-columns: repeat(4, minmax(0, 1fr));
+	gap: 0.75rem;
+	align-items: end;
+}
+
+@media (max-width: 1100px) {
+	.condition-row {
+		grid-template-columns: 1fr;
+	}
+}
+
+.condition-field {
+	display: grid;
+	gap: 0.35rem;
+}
+
+.condition-field span {
+	font-size: 0.85rem;
+	color: var(--p-text-muted-color);
+}
+</style>

@@ -35,3 +35,8 @@ export interface ReplayRequest {
 	readonly to: string
 	readonly speed?: number
 }
+
+export interface ReplayResponse {
+	readonly status: string
+	readonly eventsReplayed: number
+}

@@ -5,13 +5,51 @@ const authStore = useAuthStore()
 </script>
 
 <template>
-	<header class="flex h-16 items-center justify-between border-b border-slate-800 px-4">
-		<div class="text-lg font-semibold">Aevum Platform</div>
-		<nav class="flex items-center gap-4 text-sm text-slate-300">
-			<RouterLink to="/dashboard" class="hover:text-white">Dashboard</RouterLink>
-			<RouterLink to="/timeline" class="hover:text-white">Timeline</RouterLink>
-			<RouterLink to="/decisions" class="hover:text-white">Decisions</RouterLink>
-			<button class="rounded bg-slate-800 px-3 py-1 hover:bg-slate-700" @click="authStore.logout">Logout</button>
+	<header class="app-header">
+		<div class="app-title">Aevum Platform</div>
+		<nav class="app-nav">
+			<RouterLink to="/dashboard" class="app-link">Dashboard</RouterLink>
+			<RouterLink to="/timeline" class="app-link">Timeline</RouterLink>
+			<RouterLink to="/decisions" class="app-link">Decisions</RouterLink>
 		</nav>
+		<button type="button" class="p-button p-component" @click="authStore.logout">Logout</button>
 	</header>
 </template>
+
+<style scoped>
+.app-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 1rem;
+	padding: 0.75rem 1rem;
+	border: 1px solid var(--p-content-border-color);
+	border-radius: 0.75rem;
+	background: var(--p-content-background);
+}
+
+.app-title {
+	font-size: 1.1rem;
+	font-weight: 700;
+}
+
+.app-nav {
+	display: flex;
+	gap: 0.4rem;
+	margin-left: auto;
+	margin-right: 0.5rem;
+}
+
+.app-link {
+	text-decoration: none;
+	padding: 0.4rem 0.65rem;
+	border-radius: 0.5rem;
+	color: var(--p-text-color);
+	font-weight: 500;
+}
+
+.app-link.router-link-active {
+	background: color-mix(in oklab, var(--p-primary-color) 14%, transparent);
+	color: var(--p-primary-color);
+}
+</style>

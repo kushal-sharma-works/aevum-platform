@@ -15,9 +15,38 @@ export const useDecisionsStore = defineStore('decisions', () => {
 		isLoading.value = true
 		error.value = null
 		try {
-			const result = await decisionEngineApi.getDecisions(filters)
-			decisions.value = [...result.data]
-			pageMeta.value = result.meta
+			const rules = await decisionEngineApi.getRules()
+			const decisionGroups = await Promise.all(rules.map((rule) => decisionEngineApi.getDecisionsByRule(rule.ruleId).catch(() => [])))
+			const allDecisions = decisionGroups.flat()
+
+			const filtered = allDecisions.filter((decision) => {
+				if (filters.streamId && decision.streamId !== filters.streamId) {
+					return false
+				}
+
+				const evaluatedAt = Date.parse(decision.evaluatedAt)
+				if (filters.from && Number.isFinite(evaluatedAt) && evaluatedAt < Date.parse(filters.from)) {
+					return false
+				}
+				if (filters.to && Number.isFinite(evaluatedAt) && evaluatedAt > Date.parse(filters.to)) {
+					return false
+				}
+
+				return true
+			})
+
+			const sorted = filtered.sort((left, right) => Date.parse(right.evaluatedAt) - Date.parse(left.evaluatedAt))
+			const pageSize = filters.pageSize ?? 20
+			const page = filters.page ?? 1
+			const start = (page - 1) * pageSize
+			const end = start + pageSize
+			decisions.value = sorted.slice(start, end)
+			pageMeta.value = {
+				page,
+				pageSize,
+				totalCount: sorted.length,
+				totalPages: Math.max(1, Math.ceil(sorted.length / pageSize))
+			}
 		} catch (err) {
 			error.value = err instanceof Error ? err.message : 'Failed to fetch decisions'
 		} finally {

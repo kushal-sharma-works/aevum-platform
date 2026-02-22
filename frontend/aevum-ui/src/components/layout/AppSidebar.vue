@@ -11,13 +11,31 @@ const links: ReadonlyArray<{ readonly label: string; readonly to: string }> = [
 </script>
 
 <template>
-	<aside class="hidden w-56 border-r border-slate-800 p-3 md:block">
-		<ul class="space-y-2 text-sm">
-			<li v-for="link in links" :key="link.to">
-				<RouterLink :to="link.to" class="block rounded px-3 py-2 text-slate-300 hover:bg-slate-900 hover:text-white">
-					{{ link.label }}
-				</RouterLink>
-			</li>
-		</ul>
-	</aside>
+	<nav class="sidebar-nav">
+		<RouterLink v-for="link in links" :key="link.to" :to="link.to" class="sidebar-link">{{ link.label }}</RouterLink>
+	</nav>
 </template>
+
+<style scoped>
+.sidebar-nav {
+	display: grid;
+	gap: 0.3rem;
+	border: 1px solid var(--p-content-border-color);
+	border-radius: 0.75rem;
+	background: var(--p-content-background);
+	padding: 0.5rem;
+}
+
+.sidebar-link {
+	padding: 0.45rem 0.55rem;
+	border-radius: 0.5rem;
+	text-decoration: none;
+	color: var(--p-text-color);
+	font-weight: 500;
+}
+
+.sidebar-link.router-link-active {
+	background: color-mix(in oklab, var(--p-primary-color) 14%, transparent);
+	color: var(--p-primary-color);
+}
+</style>

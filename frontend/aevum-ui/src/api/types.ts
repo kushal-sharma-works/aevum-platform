@@ -1,7 +1,7 @@
 import type { AuditTrail } from '@/types/audit'
 import type { Decision, DecisionQueryParams, EvaluateRequest, EvaluationResponse } from '@/types/decision'
 import type { DiffResult } from '@/types/diff'
-import type { BatchIngestRequest, BatchIngestResponse, Event, IngestEventRequest, ReplayRequest } from '@/types/event'
+import type { BatchIngestRequest, BatchIngestResponse, Event, IngestEventRequest, ReplayRequest, ReplayResponse } from '@/types/event'
 import type { Rule, CreateRuleRequest } from '@/types/rule'
 import type { TimelineEntry } from '@/types/timeline'
 import type { CursorPage, PaginatedResponse } from '@/types/common'
@@ -57,13 +57,14 @@ export type EventTimelineApi = {
 	batchIngest: (req: BatchIngestRequest) => Promise<BatchIngestResponse>
 	getStreamEvents: (streamId: string, cursor?: string, limit?: number) => Promise<CursorPage<Event>>
 	getEvent: (eventId: string) => Promise<Event>
-	triggerReplay: (req: ReplayRequest) => Promise<void>
+	triggerReplay: (req: ReplayRequest) => Promise<ReplayResponse>
 }
 
 export type DecisionEngineApi = {
 	evaluate: (req: EvaluateRequest) => Promise<EvaluationResponse>
 	getDecisions: (params: DecisionQueryParams) => Promise<PaginatedResponse<Decision>>
 	getDecision: (id: string) => Promise<Decision>
+	getDecisionsByRule: (ruleId: string) => Promise<ReadonlyArray<Decision>>
 	createRule: (req: CreateRuleRequest) => Promise<Rule>
 	getRules: () => Promise<ReadonlyArray<Rule>>
 	getRuleVersions: (ruleId: string) => Promise<ReadonlyArray<Rule>>

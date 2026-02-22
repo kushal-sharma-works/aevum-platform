@@ -3,8 +3,27 @@ defineProps<{ label: string; value: string | number }>()
 </script>
 
 <template>
-	<div class="rounded border border-slate-800 p-3">
-		<div class="text-xs text-slate-400">{{ label }}</div>
-		<div class="text-xl font-semibold">{{ value }}</div>
-	</div>
+	<section class="metric-card">
+		<div class="metric-label">{{ label }}</div>
+		<div class="metric-value">{{ value }}</div>
+	</section>
 </template>
+
+<style scoped>
+.metric-card {
+	border: 1px solid var(--p-content-border-color);
+	border-radius: 0.75rem;
+	background: var(--p-content-background);
+	padding: 0.75rem;
+}
+
+.metric-label {
+	font-size: 0.8rem;
+	color: var(--p-text-muted-color);
+}
+
+.metric-value {
+	font-size: 1.2rem;
+	font-weight: 600;
+}
+</style>

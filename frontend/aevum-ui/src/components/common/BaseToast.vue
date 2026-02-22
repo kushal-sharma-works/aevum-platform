@@ -1,20 +1,18 @@
 <script setup lang="ts">
-defineProps<{ message: string; type?: 'success' | 'error' | 'warning' | 'info' }>()
+import { computed } from 'vue'
+
+const props = defineProps<{ message: string; type?: 'success' | 'error' | 'warning' | 'info' }>()
+
+const toneClass = computed(() => {
+	if (props.type === 'success') return 'p-message-success'
+	if (props.type === 'error') return 'p-message-error'
+	if (props.type === 'warning') return 'p-message-warn'
+	return 'p-message-info'
+})
 </script>
 
 <template>
-	<div
-		:class="[
-			'rounded px-3 py-2 text-sm shadow',
-			type === 'success'
-				? 'bg-emerald-700'
-				: type === 'error'
-					? 'bg-rose-700'
-					: type === 'warning'
-						? 'bg-amber-700'
-						: 'bg-blue-700'
-		]"
-	>
+	<div class="p-message p-component" :class="toneClass">
 		{{ message }}
 	</div>
 </template>

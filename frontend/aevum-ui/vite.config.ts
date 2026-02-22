@@ -12,13 +12,18 @@ export default defineConfig({
 	server: {
 		port: 3000,
 		proxy: {
+			'/api/events/admin': {
+				target: 'http://localhost:9091',
+				changeOrigin: true,
+				rewrite: (path) => path.replace('/api/events/admin', '/admin')
+			},
 			'/api/events': {
-				target: 'http://localhost:8080',
+				target: 'http://localhost:8081',
 				changeOrigin: true,
 				rewrite: (path) => path.replace('/api/events', '/api/v1')
 			},
 			'/api/decisions': {
-				target: 'http://localhost:8081',
+				target: 'http://localhost:8080',
 				changeOrigin: true,
 				rewrite: (path) => path.replace('/api/decisions', '/api/v1')
 			},
@@ -32,6 +37,7 @@ export default defineConfig({
 	test: {
 		environment: 'jsdom',
 		globals: true,
-		include: ['tests/**/*.test.ts']
+		include: ['tests/**/*.test.ts'],
+		setupFiles: ['tests/setup.ts']
 	}
 })
