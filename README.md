@@ -10,35 +10,35 @@ It combines immutable event ingestion, versioned rules, and traceable decision o
 
 ```mermaid
 flowchart LR
-	Browser[User / Browser]
-	Frontend[Frontend\nVue 3 + TypeScript]
-	ET[Event Timeline Service\nGo Gin+Echo]
-	DE[Decision Engine\n.NET 9]
-	QA[Query & Audit Service\nGo Gin]
-	DDB[(DynamoDB)]
-	MDB[(MongoDB / DocumentDB)]
-	ES[(OpenSearch / Elasticsearch)]
-	OTel[OTel Collector]
-	Prom[(Prometheus)]
-	Graf[(Grafana)]
+	Browser["User / Browser"];
+	Frontend["Frontend: Vue 3 + TypeScript"];
+	ET["Event Timeline Service: Go Gin + Echo"];
+	DE["Decision Engine: .NET 9"];
+	QA["Query & Audit Service: Go Gin"];
+	DDB[("DynamoDB")];
+	MDB[("MongoDB / DocumentDB")];
+	ES[("OpenSearch / Elasticsearch")];
+	OTel["OTel Collector"];
+	Prom[("Prometheus")];
+	Graf[("Grafana")];
 
-	Browser --> Frontend
-	Frontend --> ET
-	Frontend --> DE
-	Frontend --> QA
+	Browser --> Frontend;
+	Frontend --> ET;
+	Frontend --> DE;
+	Frontend --> QA;
 
-	ET --> DDB
-	DE --> MDB
-	DE --> ET
-	QA --> ET
-	QA --> DE
-	QA --> ES
+	ET --> DDB;
+	DE --> MDB;
+	DE --> ET;
+	QA --> ET;
+	QA --> DE;
+	QA --> ES;
 
-	ET --> OTel
-	DE --> OTel
-	QA --> OTel
-	OTel --> Prom
-	Prom --> Graf
+	ET --> OTel;
+	DE --> OTel;
+	QA --> OTel;
+	OTel --> Prom;
+	Prom --> Graf;
 ```
 
 ## Why Aevum?
@@ -54,24 +54,36 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-	Client[Client / Browser] --> UI[Frontend (Vue)]
-	UI --> ET[Event Timeline Service]
-	UI --> DE[Decision Engine]
-	UI --> QA[Query & Audit Service]
+	Client["Client / Browser"];
+	UI["Frontend Vue"];
+	ET["Event Timeline Service"];
+	DE["Decision Engine"];
+	QA["Query & Audit Service"];
+	DDB[("DynamoDB")];
+	MDB[("MongoDB")];
+	ES[("Elasticsearch / OpenSearch")];
+	OTel["OTel Collector"];
+	Prom[("Prometheus")];
+	Graf[("Grafana")];
 
-	ET --> DDB[(DynamoDB)]
-	DE --> MDB[(MongoDB)]
-	QA --> ES[(Elasticsearch / OpenSearch)]
+	Client --> UI;
+	UI --> ET;
+	UI --> DE;
+	UI --> QA;
 
-	DE -->|HTTP| ET
-	QA -->|HTTP| ET
-	QA -->|HTTP| DE
+	ET --> DDB;
+	DE --> MDB;
+	QA --> ES;
 
-	ET --> OTel[OTel Collector]
-	DE --> OTel
-	QA --> OTel
-	OTel --> Prom[Prometheus]
-	Prom --> Graf[Grafana]
+	DE -->|HTTP| ET;
+	QA -->|HTTP| ET;
+	QA -->|HTTP| DE;
+
+	ET --> OTel;
+	DE --> OTel;
+	QA --> OTel;
+	OTel --> Prom;
+	Prom --> Graf;
 ```
 
 ### Services
