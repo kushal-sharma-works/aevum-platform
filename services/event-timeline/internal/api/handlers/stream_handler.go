@@ -23,7 +23,7 @@ func (h *StreamHandler) GetByStream(c *gin.Context) {
 	streamID := c.Param("streamId")
 	limit := int32(50)
 	if raw := c.Query("limit"); raw != "" {
-		parsed, err := strconv.Atoi(raw)
+		parsed, err := strconv.ParseInt(raw, 10, 32)
 		if err != nil {
 			httputil.BadRequest(c, "invalid_limit", "limit must be a valid integer")
 			return
